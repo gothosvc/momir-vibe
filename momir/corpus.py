@@ -19,17 +19,29 @@ CACHE_PATH = pathlib.Path(__file__).parent.parent / "data" / "cards_cache.json"
 _REMINDER_TEXT_RE = re.compile(r"\([^)]*\)")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
+# Sentence position within a card's oracle text, capped so we get a handful of
+# well-populated buckets (opener / 2nd sentence / later) instead of a long
+# tail of buckets with one or two samples each. Position matters because real
+# continuation clauses -- "If a spell is countered this way, exile it instead"
+# -- only make sense following the sentence that set them up; letting one get
+# picked as an opening line is what produces nonsensical-sounding generated
+# text. See momir/markov.py.
+MAX_SENTENCE_POSITION = 2
+
 
 @dataclass
 class Corpus:
     raw_cards: list[dict]
 
     names: list[str] = field(default_factory=list)
-    # cmc -> list of oracle-text sentences from creatures at that cmc.
-    # Kept per-cmc (rather than one flat pool) so a 1-drop's generated text
-    # is trained only on what 1-drops actually say -- not phrases pulled in
-    # from eight-mana bombs.
-    sentences_by_cmc: dict[int, list[str]] = field(default_factory=lambda: defaultdict(list))
+    # cmc -> list of (sentence, position) pairs from creatures at that cmc,
+    # where position is the sentence's index (0 = opener) within its source
+    # card's oracle text, capped at MAX_SENTENCE_POSITION. Kept per-cmc
+    # (rather than one flat pool) so a 1-drop's generated text is trained
+    # only on what 1-drops actually say -- not phrases pulled in from
+    # eight-mana bombs -- and kept per-position so generated text opens with
+    # real openers rather than orphaned continuation clauses.
+    sentences_by_cmc: dict[int, list[tuple[str, int]]] = field(default_factory=lambda: defaultdict(list))
 
     # cmc -> list of raw mana_cost strings actually used at that cmc
     mana_costs_by_cmc: dict[int, list[str]] = field(default_factory=lambda: defaultdict(list))
@@ -101,7 +113,8 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
             continue
         cmc = int(cmc)
 
-        corpus.sentences_by_cmc[cmc].extend(_extract_sentences(card.get("oracle_text")))
+        for position, sentence in enumerate(_extract_sentences(card.get("oracle_text"))):
+            corpus.sentences_by_cmc[cmc].append((sentence, min(position, MAX_SENTENCE_POSITION)))
 
         mana_cost = card.get("mana_cost")
         if mana_cost:

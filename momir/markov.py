@@ -8,7 +8,12 @@ Two flavors are used elsewhere in the generator:
   training on "Serra Angel" + "Shivan Dragon" can yield "Shivan Angel").
 
 - ``WordMarkovChain``: word-level, trained on sentences pulled from real
-  oracle text. Used to generate loose, flavorful extra rules text.
+  oracle text. Used to generate loose, flavorful extra rules text. Training
+  sentences carry a "position" (their index within the source card's oracle
+  text), and generation can request a position -- this is what keeps
+  generated opening lines sounding like real openers instead of orphaned
+  continuation clauses like "If a spell is countered this way, ..." that only
+  make sense following the sentence that set them up.
 """
 from __future__ import annotations
 
@@ -77,26 +82,37 @@ class WordMarkovChain:
     def __init__(self, order: int = 2) -> None:
         self.order = order
         self._model: dict[tuple[str, ...], Counter] = defaultdict(Counter)
-        self._starts: list[tuple[str, ...]] = []
+        # sentence position (0 = opener, 1 = second sentence, ...) -> start
+        # keys seen at that position. Every trained sentence still feeds
+        # self._model (mid-sentence transitions are valid regardless of where
+        # the sentence sat in its source card), but only position-0 sentences
+        # should ever be offered as a chain *opener*.
+        self._starts_by_position: dict[int, list[tuple[str, ...]]] = defaultdict(list)
 
-    def train(self, sentences: list[str]) -> None:
-        for sentence in sentences:
+    def train(self, sentences: list[tuple[str, int]]) -> None:
+        for sentence, position in sentences:
             words = sentence.split()
             if len(words) < self.order + 1:
                 continue
             padded = [START] * self.order + words + [END]
             start_key = tuple(padded[: self.order])
-            self._starts.append(start_key)
+            self._starts_by_position[position].append(start_key)
             for i in range(len(padded) - self.order):
                 key = tuple(padded[i : i + self.order])
                 nxt = padded[i + self.order]
                 self._model[key][nxt] += 1
 
-    def generate(self, max_words: int = 25, rng: random.Random | None = None) -> str:
-        if not self._starts:
-            return ""
+    def generate(
+        self, max_words: int = 25, rng: random.Random | None = None, position: int = 0
+    ) -> str:
         rng = rng or random
-        key = rng.choice(self._starts)
+        # Fall back to the opener pool (always the best-populated) if this
+        # position wasn't seen often enough at this mana value to have its
+        # own starts -- e.g. a sparse mana value borrowing neighbor sentences.
+        starts = self._starts_by_position.get(position) or self._starts_by_position.get(0)
+        if not starts:
+            return ""
+        key = rng.choice(starts)
         out: list[str] = []
         for _ in range(max_words):
             choices = self._model.get(key)

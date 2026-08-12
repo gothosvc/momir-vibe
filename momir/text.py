@@ -61,7 +61,7 @@ def generate_keywords(corpus: Corpus, mana_value: int, rng: random.Random | None
     return chosen
 
 
-def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[str]:
+def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[tuple[str, int]]:
     """Sentences from creatures at this exact mana value, widened to
     progressively further neighbors only if there isn't enough to train on."""
     collected = list(corpus.sentences_by_cmc.get(mana_value, []))
@@ -94,8 +94,11 @@ def generate_rules_text(
         return []
 
     lines: list[str] = []
-    for _ in range(rng.randint(1, MAX_EXTRA_SENTENCES)):
-        sentence = chain.generate(max_words=22, rng=rng)
+    for position in range(rng.randint(1, MAX_EXTRA_SENTENCES)):
+        # position 0 draws from real opening sentences, position 1+ from real
+        # follow-up sentences -- so a second line reads like a natural
+        # continuation clause instead of an unrelated second opener.
+        sentence = chain.generate(max_words=22, rng=rng, position=position)
         if not sentence:
             continue
         sentence = sentence.replace("~", card_name)
