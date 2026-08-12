@@ -25,7 +25,11 @@ class Corpus:
     raw_cards: list[dict]
 
     names: list[str] = field(default_factory=list)
-    sentences: list[str] = field(default_factory=list)
+    # cmc -> list of oracle-text sentences from creatures at that cmc.
+    # Kept per-cmc (rather than one flat pool) so a 1-drop's generated text
+    # is trained only on what 1-drops actually say -- not phrases pulled in
+    # from eight-mana bombs.
+    sentences_by_cmc: dict[int, list[str]] = field(default_factory=lambda: defaultdict(list))
 
     # cmc -> list of raw mana_cost strings actually used at that cmc
     mana_costs_by_cmc: dict[int, list[str]] = field(default_factory=lambda: defaultdict(list))
@@ -92,12 +96,12 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
         if name:
             corpus.names.append(name)
 
-        corpus.sentences.extend(_extract_sentences(card.get("oracle_text")))
-
         cmc = card.get("cmc")
         if cmc is None:
             continue
         cmc = int(cmc)
+
+        corpus.sentences_by_cmc[cmc].extend(_extract_sentences(card.get("oracle_text")))
 
         mana_cost = card.get("mana_cost")
         if mana_cost:

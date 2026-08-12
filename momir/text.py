@@ -20,6 +20,14 @@ KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasi
 EXTRA_TEXT_CHANCE = 0.55
 MAX_EXTRA_SENTENCES = 2
 
+# Minimum sentence pool a mana value's text chain wants before we trust it to
+# generate coherent output. Sparse mana values (very low or very high mv have
+# few real creatures) borrow sentences from progressively wider neighboring
+# mana values -- never from the corpus at large -- to stay in the right
+# power-level neighborhood while still having enough to train on.
+MIN_TRAINING_SENTENCES = 60
+MAX_BORROW_RADIUS = 32
+
 
 def _keyword_pool(corpus: Corpus, mana_value: int):
     pool = corpus.keywords_by_cmc.get(mana_value)
@@ -53,10 +61,29 @@ def generate_keywords(corpus: Corpus, mana_value: int, rng: random.Random | None
     return chosen
 
 
-def build_text_chain(corpus: Corpus) -> WordMarkovChain:
-    chain = WordMarkovChain(order=2)
-    chain.train(corpus.sentences)
-    return chain
+def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[str]:
+    """Sentences from creatures at this exact mana value, widened to
+    progressively further neighbors only if there isn't enough to train on."""
+    collected = list(corpus.sentences_by_cmc.get(mana_value, []))
+
+    radius = 1
+    while len(collected) < MIN_TRAINING_SENTENCES and radius <= MAX_BORROW_RADIUS:
+        for neighbor in (mana_value - radius, mana_value + radius):
+            collected.extend(corpus.sentences_by_cmc.get(neighbor, []))
+        radius += 1
+
+    return collected
+
+
+def build_text_chains(corpus: Corpus, mana_values: range) -> dict[int, WordMarkovChain]:
+    """One word-Markov chain per mana value, each trained only on sentences
+    from creatures at (or, if sparse, near) that mana value."""
+    chains: dict[int, WordMarkovChain] = {}
+    for mana_value in mana_values:
+        chain = WordMarkovChain(order=2)
+        chain.train(_sentences_for_mana_value(corpus, mana_value))
+        chains[mana_value] = chain
+    return chains
 
 
 def generate_rules_text(

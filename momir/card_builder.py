@@ -24,7 +24,11 @@ class CardGenerator:
     def __init__(self, corpus: Corpus | None = None) -> None:
         self.corpus = corpus or get_corpus()
         self.name_chain: CharMarkovChain = build_name_chain(self.corpus)
-        self.text_chain: WordMarkovChain = text.build_text_chain(self.corpus)
+        # One text chain per mana value, so a 1-drop's generated text is only
+        # ever trained on what real 1-drops say -- see momir/text.py.
+        self.text_chains: dict[int, WordMarkovChain] = text.build_text_chains(
+            self.corpus, range(MIN_MANA_VALUE, MAX_MANA_VALUE + 1)
+        )
         self._next_collector_number = 1
 
     def _rarity(self, rng: random.Random) -> str:
@@ -53,7 +57,7 @@ class CardGenerator:
         type_line = types.generate_type_line(self.corpus, mana_value, rng=rng)
         power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng)
         keywords = text.generate_keywords(self.corpus, mana_value, rng=rng)
-        rules_text = text.generate_rules_text(self.text_chain, name, rng=rng)
+        rules_text = text.generate_rules_text(self.text_chains[mana_value], name, rng=rng)
 
         return Card(
             name=name,

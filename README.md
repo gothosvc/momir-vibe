@@ -7,8 +7,11 @@ doesn't exist.
 Card **names** are generated with a character-level Markov chain trained on
 real creature names. **Rules text** is a mix of real keyword abilities
 (sampled by how often they appear at that mana value) plus loose flavor text
-from a word-level Markov chain trained on real oracle text. **Mana cost,
-type line, and power/toughness** are sampled from the actual distribution of
+from a word-level Markov chain -- trained *only* on oracle text from real
+creatures at that same mana value (widening to nearby mana values only if
+there isn't enough data), so a 1-drop's generated text is never built from
+words that only ever show up on eight-mana bombs. **Mana cost, type line,
+and power/toughness** are likewise sampled from the actual distribution of
 real creatures at that mana value, so generated cards feel "on curve" even
 though nothing about them is real.
 
