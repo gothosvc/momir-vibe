@@ -76,7 +76,37 @@ def _extract_subtypes(type_line: str) -> list[str]:
     return subtypes.split()
 
 
-def _extract_sentences(oracle_text: str | None) -> list[str]:
+def _self_reference_patterns(name: str) -> list[str]:
+    """Strings within a card's own oracle text that refer back to itself, longest
+    first so e.g. a full "Adeline, Resplendent Cathar" match wins out over the
+    "Adeline" short form it contains. Split/adventure names ("Beanstalk Giant //
+    Fertile Footsteps") contribute a pattern per face; legendary subtitles
+    ("Aang, A Lot to Learn") contribute the pre-comma short name too, since
+    real oracle text refers to itself that way (see corpus.py's cached
+    "Aang has vigilance..." example)."""
+    patterns: set[str] = set()
+    for face in name.split(" // "):
+        face = face.strip()
+        if not face:
+            continue
+        patterns.add(face)
+        short = face.split(",")[0].strip()
+        if short:
+            patterns.add(short)
+    return sorted(patterns, key=len, reverse=True)
+
+
+def _normalize_self_references(text: str, name: str) -> str:
+    """Replace a card's self-references with the "~" placeholder real MTG
+    templating uses, so sentences trained from e.g. Aang don't leak "Aang"
+    into a generated card named something else -- text.py substitutes the
+    generated card's own name back in at generation time."""
+    for pattern in _self_reference_patterns(name):
+        text = re.sub(rf"\b{re.escape(pattern)}\b", "~", text)
+    return text
+
+
+def _extract_sentences(oracle_text: str | None, name: str = "") -> list[str]:
     if not oracle_text:
         return []
     sentences = []
@@ -84,6 +114,8 @@ def _extract_sentences(oracle_text: str | None) -> list[str]:
         line = _REMINDER_TEXT_RE.sub("", line).strip()
         if not line:
             continue
+        if name:
+            line = _normalize_self_references(line, name)
         for sentence in _SENTENCE_SPLIT_RE.split(line):
             sentence = sentence.strip()
             if sentence:
@@ -113,7 +145,7 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
             continue
         cmc = int(cmc)
 
-        for position, sentence in enumerate(_extract_sentences(card.get("oracle_text"))):
+        for position, sentence in enumerate(_extract_sentences(card.get("oracle_text"), name or "")):
             corpus.sentences_by_cmc[cmc].append((sentence, min(position, MAX_SENTENCE_POSITION)))
 
         mana_cost = card.get("mana_cost")
