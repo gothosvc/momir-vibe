@@ -190,6 +190,12 @@ def _numeric(value) -> float | None:
 
 
 def _extract_subtypes(type_line: str) -> list[str]:
+    # Split/adventure cards ("Creature — Giant // Sorcery — Adventure") carry
+    # both faces' type lines in one string -- without this, partitioning on
+    # the first em dash pulls in the *second* face's " // Sorcery —
+    # Adventure" tail too, and "//"/"Sorcery"/"Adventure" leak into the
+    # subtype pool as if they were real creature subtypes.
+    type_line = type_line.split(" // ")[0]
     if "—" not in type_line:
         return []
     _, _, subtypes = type_line.partition("—")
@@ -239,7 +245,13 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
             line = _normalize_self_references(line, name)
         for sentence in _SENTENCE_SPLIT_RE.split(line):
             sentence = sentence.strip()
-            if sentence:
+            # Self-quoted sub-abilities ('...has "Whenever this creature
+            # attacks, ..."') pair an opening and closing quote that can
+            # land in different sentences (or get sentence-split apart
+            # entirely) -- word-splicing has no way to keep them balanced,
+            # so quoted sentences are dropped rather than left to produce
+            # stray dangling quote marks.
+            if sentence and '"' not in sentence:
                 sentences.append((sentence, _sentence_shape(sentence)))
     return sentences
 

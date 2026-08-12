@@ -36,8 +36,14 @@ TEXT_MARKOV_ORDER = 3
 
 # Retries for a single generated line before giving up on it, discarding
 # generations that slipped past shape-bucketing with an obvious tell (see
-# _is_clean_sentence) rather than ever showing one.
+# _is_complete_sentence) rather than ever showing one.
 SENTENCE_ATTEMPTS = 8
+
+# Word cap per generated line. Real individual sentences run up to ~31 words
+# at the 99th percentile, so this is generous headroom -- a chain still
+# going this long is more likely mid-splice than genuinely still inside one
+# real sentence. See _is_complete_sentence for what happens when it's hit.
+MAX_SENTENCE_WORDS = 32
 
 # Minimum sentence pool a mana value's text chain wants before we trust it to
 # generate coherent output. Sparse mana values (very low or very high mv have
@@ -123,10 +129,19 @@ def build_text_chains(corpus: Corpus, mana_values: range) -> dict[int, WordMarko
     return chains
 
 
-def _is_clean_sentence(sentence: str) -> bool:
-    """Backstop against generations that slipped past corpus filtering with
-    an obvious tell -- most commonly two same-shape activated-ability
-    clauses fusing into a double "cost: effect: effect"."""
+def _is_complete_sentence(sentence: str) -> bool:
+    """Backstop against generations that never actually reached a genuine
+    sentence end. Every trained sentence carries its own real terminal
+    punctuation (that's how corpus.py split sentences out of oracle text in
+    the first place) -- so a chain that reaches a real ending should too.
+    One that doesn't is a giveaway it got cut off mid-clause by the word cap
+    instead, which otherwise reads as a dangling fragment with a period
+    stapled onto whatever word it happened to stop on (".../, and.",
+    "...play that."). Also catches the same double-colon/bullet/pipe tells
+    as before -- most commonly two same-shape activated-ability clauses
+    fusing into a double "cost: effect: effect"."""
+    if not sentence.endswith((".", "!", "?")):
+        return False
     if sentence.count(":") >= 2:
         return False
     if "•" in sentence or "|" in sentence:
@@ -153,14 +168,11 @@ def generate_rules_text(
         # continuation clause instead of an unrelated second opener.
         sentence = ""
         for _ in range(SENTENCE_ATTEMPTS):
-            candidate = chain.generate(max_words=22, rng=rng, position=position, shape=shape)
-            if candidate and _is_clean_sentence(candidate):
+            candidate = chain.generate(max_words=MAX_SENTENCE_WORDS, rng=rng, position=position, shape=shape)
+            if candidate and _is_complete_sentence(candidate):
                 sentence = candidate
                 break
         if not sentence:
             continue
-        sentence = sentence.replace("~", card_name)
-        if not sentence.endswith((".", "!", "?")):
-            sentence += "."
-        lines.append(sentence)
+        lines.append(sentence.replace("~", card_name))
     return lines
