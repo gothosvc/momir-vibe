@@ -1,0 +1,111 @@
+"""
+Minimal, dependency-free Markov chain implementations.
+
+Two flavors are used elsewhere in the generator:
+
+- ``CharMarkovChain``: character-level, trained on card names. This is what
+  gives generated names their "sounds like Magic but isn't" quality (e.g.
+  training on "Serra Angel" + "Shivan Dragon" can yield "Shivan Angel").
+
+- ``WordMarkovChain``: word-level, trained on sentences pulled from real
+  oracle text. Used to generate loose, flavorful extra rules text.
+"""
+from __future__ import annotations
+
+import random
+from collections import Counter, defaultdict
+
+START = "\0"
+END = "\1"
+
+
+class CharMarkovChain:
+    """Character-level Markov chain over raw strings (e.g. card names)."""
+
+    def __init__(self, order: int = 3) -> None:
+        self.order = order
+        self._model: dict[str, Counter] = defaultdict(Counter)
+
+    def train(self, samples: list[str]) -> None:
+        for sample in samples:
+            if not sample:
+                continue
+            padded = (START * self.order) + sample + END
+            for i in range(len(padded) - self.order):
+                key = padded[i : i + self.order]
+                nxt = padded[i + self.order]
+                self._model[key][nxt] += 1
+
+    def generate(self, max_len: int = 24, rng: random.Random | None = None) -> str:
+        rng = rng or random
+        key = START * self.order
+        out: list[str] = []
+        for _ in range(max_len):
+            choices = self._model.get(key)
+            if not choices:
+                break
+            nxt = rng.choices(list(choices.keys()), weights=list(choices.values()))[0]
+            if nxt == END:
+                break
+            out.append(nxt)
+            key = (key + nxt)[-self.order :]
+        return "".join(out).strip()
+
+    def generate_title(
+        self, min_len: int = 4, max_len: int = 24, attempts: int = 25, rng: random.Random | None = None
+    ) -> str:
+        """Generate a name, retrying until it's a plausible length and doesn't
+        trail off mid-phrase on a dangling stopword (e.g. "... of the")."""
+        rng = rng or random
+        best = ""
+        for _ in range(attempts):
+            candidate = self.generate(max_len=max_len, rng=rng)
+            last_word = candidate.rsplit(" ", 1)[-1].lower() if candidate else ""
+            if len(candidate) >= min_len and last_word not in _DANGLING_STOPWORDS:
+                return candidate
+            if len(candidate) > len(best):
+                best = candidate
+        return best or "Nameless Horror"
+
+
+_DANGLING_STOPWORDS = {"of", "the", "and", "an", "a"}
+
+
+class WordMarkovChain:
+    """Word-level Markov chain over tokenized sentences (e.g. oracle text)."""
+
+    def __init__(self, order: int = 2) -> None:
+        self.order = order
+        self._model: dict[tuple[str, ...], Counter] = defaultdict(Counter)
+        self._starts: list[tuple[str, ...]] = []
+
+    def train(self, sentences: list[str]) -> None:
+        for sentence in sentences:
+            words = sentence.split()
+            if len(words) < self.order + 1:
+                continue
+            padded = [START] * self.order + words + [END]
+            start_key = tuple(padded[: self.order])
+            self._starts.append(start_key)
+            for i in range(len(padded) - self.order):
+                key = tuple(padded[i : i + self.order])
+                nxt = padded[i + self.order]
+                self._model[key][nxt] += 1
+
+    def generate(self, max_words: int = 25, rng: random.Random | None = None) -> str:
+        if not self._starts:
+            return ""
+        rng = rng or random
+        key = rng.choice(self._starts)
+        out: list[str] = []
+        for _ in range(max_words):
+            choices = self._model.get(key)
+            if not choices:
+                break
+            nxt = rng.choices(list(choices.keys()), weights=list(choices.values()))[0]
+            if nxt == END:
+                break
+            if nxt != START:
+                out.append(nxt)
+            key = (key + (nxt,))[-self.order :]
+        return " ".join(out).strip()

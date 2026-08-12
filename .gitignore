@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+data/cards_cache.json
+.DS_Store
+.claude/settings.local.json
