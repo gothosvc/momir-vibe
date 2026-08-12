@@ -20,6 +20,19 @@ KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasi
 EXTRA_TEXT_CHANCE = 0.55
 MAX_EXTRA_SENTENCES = 2
 
+# Word-chain order for rules text. Higher than the default (2) deliberately:
+# order 2 was splicing sentences at nearly any shared 2-word junction, which
+# (even with per-shape modeling -- see corpus.py's _sentence_shape) could
+# still fuse two same-shape clauses into nonsense like a double "cost:
+# effect: effect". Order 3 requires a longer real match before it'll
+# diverge, trading a bit of novelty for a lot fewer broken splices.
+TEXT_MARKOV_ORDER = 3
+
+# Retries for a single generated line before giving up on it, discarding
+# generations that slipped past shape-bucketing with an obvious tell (see
+# _is_clean_sentence) rather than ever showing one.
+SENTENCE_ATTEMPTS = 8
+
 # Minimum sentence pool a mana value's text chain wants before we trust it to
 # generate coherent output. Sparse mana values (very low or very high mv have
 # few real creatures) borrow sentences from progressively wider neighboring
@@ -61,7 +74,7 @@ def generate_keywords(corpus: Corpus, mana_value: int, rng: random.Random | None
     return chosen
 
 
-def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[tuple[str, int]]:
+def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[tuple[str, int, str]]:
     """Sentences from creatures at this exact mana value, widened to
     progressively further neighbors only if there isn't enough to train on."""
     collected = list(corpus.sentences_by_cmc.get(mana_value, []))
@@ -80,10 +93,21 @@ def build_text_chains(corpus: Corpus, mana_values: range) -> dict[int, WordMarko
     from creatures at (or, if sparse, near) that mana value."""
     chains: dict[int, WordMarkovChain] = {}
     for mana_value in mana_values:
-        chain = WordMarkovChain(order=2)
+        chain = WordMarkovChain(order=TEXT_MARKOV_ORDER)
         chain.train(_sentences_for_mana_value(corpus, mana_value))
         chains[mana_value] = chain
     return chains
+
+
+def _is_clean_sentence(sentence: str) -> bool:
+    """Backstop against generations that slipped past corpus filtering with
+    an obvious tell -- most commonly two same-shape activated-ability
+    clauses fusing into a double "cost: effect: effect"."""
+    if sentence.count(":") >= 2:
+        return False
+    if "•" in sentence or "|" in sentence:
+        return False
+    return True
 
 
 def generate_rules_text(
@@ -93,12 +117,22 @@ def generate_rules_text(
     if rng.random() >= EXTRA_TEXT_CHANCE:
         return []
 
+    # Pick one shape (trigger / activated / static -- see corpus.py's
+    # _sentence_shape) for the whole block, so a second line reads as more
+    # of the same construct rather than an unrelated one.
+    shape = chain.choose_shape(rng)
+
     lines: list[str] = []
     for position in range(rng.randint(1, MAX_EXTRA_SENTENCES)):
         # position 0 draws from real opening sentences, position 1+ from real
         # follow-up sentences -- so a second line reads like a natural
         # continuation clause instead of an unrelated second opener.
-        sentence = chain.generate(max_words=22, rng=rng, position=position)
+        sentence = ""
+        for _ in range(SENTENCE_ATTEMPTS):
+            candidate = chain.generate(max_words=22, rng=rng, position=position, shape=shape)
+            if candidate and _is_clean_sentence(candidate):
+                sentence = candidate
+                break
         if not sentence:
             continue
         sentence = sentence.replace("~", card_name)

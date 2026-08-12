@@ -52,7 +52,10 @@ def build_name_chains(corpus: Corpus) -> NameChains:
     character.train(corpus.character_names)
 
     common = WordMarkovChain(order=COMMON_NAME_WORD_ORDER)
-    common.train([(name, 0) for name in corpus.common_names])
+    # WordMarkovChain trains on (sentence, position, shape) triples; names
+    # don't have a construct "shape" the way rules text does, so every name
+    # gets the same constant tag -- shape-splitting is a no-op here.
+    common.train([(name, 0, "name") for name in corpus.common_names])
 
     total = len(corpus.character_names) + len(corpus.common_names)
     character_chance = (len(corpus.character_names) / total) if total else 0.0

@@ -17,7 +17,15 @@ how often real creatures are legendary. **Rules text** is a mix of real keyword 
 from a word-level Markov chain -- trained *only* on oracle text from real
 creatures at that same mana value (widening to nearby mana values only if
 there isn't enough data), so a 1-drop's generated text is never built from
-words that only ever show up on eight-mana bombs. **Mana cost, type line,
+words that only ever show up on eight-mana bombs. Sentences are also kept
+separate by construct ("shape" -- triggered/activated/static ability) during
+training and generation, so a generated line can't wander mid-sentence from
+one construct into another (the source of most outright-broken output, e.g.
+a triggered ability fusing into an unrelated activated ability's "cost:"
+clause), and line-level templating that only makes sense inside its own card
+frame (Saga chapters, Class level headers, Case/d20-roll threshold rows,
+Choose-one's bullet options) is filtered out of training entirely rather
+than left for the chain to mangle. **Mana cost, type line,
 and power/toughness** are likewise sampled from the actual distribution of
 real creatures at that mana value, so generated cards feel "on curve" even
 though nothing about them is real.
