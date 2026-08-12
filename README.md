@@ -13,7 +13,11 @@ syllables; legendary creatures get personal character names ("Jace",
 free to invent new syllables since that's how invented character names are
 supposed to sound. How often a generated card gets a character name mirrors
 how often real creatures are legendary. **Rules text** is a mix of real keyword abilities
-(sampled by how often they appear at that mana value) plus loose flavor text
+(sampled by how often they appear at that mana value, restricted to keywords
+we found real printed text for and pruned of one-off card-specific ability
+words -- see corpus.py's MIN_KEYWORD_OCCURRENCES -- and given a real observed
+value/cost when the keyword takes one, e.g. "Ward" -> "Ward {2}", so a
+keyword never shows up incomplete) plus loose flavor text
 from a word-level Markov chain -- trained *only* on oracle text from real
 creatures at that same mana value (widening to nearby mana values only if
 there isn't enough data), so a 1-drop's generated text is never built from

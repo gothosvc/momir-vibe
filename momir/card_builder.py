@@ -56,7 +56,7 @@ class CardGenerator:
 
         type_line = types.generate_type_line(self.corpus, mana_value, rng=rng)
         power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng)
-        keywords = text.generate_keywords(self.corpus, mana_value, rng=rng)
+        keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng)
         rules_text = text.generate_rules_text(self.text_chains[mana_value], name, rng=rng)
 
         return Card(

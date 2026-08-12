@@ -68,6 +68,58 @@ def _sentence_shape(sentence: str) -> str:
     return "static"
 
 
+# A keyword name only ever appears on a handful of cards below this count --
+# in practice that's reliably a card-unique ability-word title Scryfall filed
+# under "keywords" alongside real reusable keywords ("Nitro-9", "For Auld
+# Lang Syne"), not a real keyword ability. Verified against the live corpus:
+# 389 of 641 distinct keyword names occur on 1-2 cards each, and are
+# overwhelmingly one-off titles like these; real (if rare) mechanics start
+# showing up at 3+.
+MIN_KEYWORD_OCCURRENCES = 3
+
+
+def _keyword_occurrence(oracle_text: str, keyword: str, name: str = "") -> str | None:
+    """The value/cost suffix actually printed after `keyword` on this card
+    ("" if it's bare), or None if `keyword` never literally appears in the
+    text at all. The None case matters: Scryfall's keywords list includes
+    umbrella family tags ("Landwalk", "Typecycling") alongside the specific
+    variant actually printed ("Swampwalk", "Forestcycling") -- the umbrella
+    tag itself is never real card text, so it shouldn't be offered up as a
+    standalone generated keyword either.
+
+    Some keyword values reference their own card by name (a Heroic trigger's
+    "Whenever you cast a spell that targets <Name>") -- normalized to "~"
+    same as sentence training, so it doesn't leak into a differently-named
+    generated card. See _normalize_self_references.
+
+    Only the trailing side is stripped: real templating actually uses two
+    different conventions after a keyword name -- an alt-cost dash fuses
+    directly ("Ward—Pay 2 life"), an ability word gets a space on both sides
+    ("Landfall — Whenever ..."). Keeping the leading whitespace (or lack of
+    it) verbatim reproduces whichever one the source card actually used,
+    rather than guessing."""
+    text = _REMINDER_TEXT_RE.sub("", oracle_text)
+    if name:
+        text = _normalize_self_references(text, name)
+    match = re.search(rf"\b{re.escape(keyword)}\b([^,.;\n]*)", text, re.IGNORECASE)
+    return match.group(1).rstrip() if match else None
+
+
+def _prune_rare_keywords(corpus: Corpus) -> None:
+    totals: Counter = Counter()
+    for counter in corpus.keywords_by_cmc.values():
+        totals.update(counter)
+    rare = {kw for kw, n in totals.items() if n < MIN_KEYWORD_OCCURRENCES}
+    if not rare:
+        return
+    for counter in corpus.keywords_by_cmc.values():
+        for kw in rare:
+            counter.pop(kw, None)
+    for values in corpus.keyword_values_by_cmc.values():
+        for kw in rare:
+            values.pop(kw, None)
+
+
 @dataclass
 class Corpus:
     raw_cards: list[dict]
@@ -103,8 +155,25 @@ class Corpus:
     # cmc -> Counter of individual creature subtypes seen at that cmc
     subtypes_by_cmc: dict[int, Counter] = field(default_factory=lambda: defaultdict(Counter))
 
-    # cmc -> Counter of keyword abilities seen at that cmc
+    # cmc -> Counter of keyword ability names seen at that cmc, restricted to
+    # keywords we actually found literal printed text for on their source
+    # card (see _keyword_occurrence) -- Scryfall's keywords list also
+    # includes umbrella family tags ("Landwalk" alongside the "Swampwalk"
+    # actually printed) that are never themselves real card text, and those
+    # are dropped rather than offered up standalone. Rare one-off ability
+    # words unique to a single card ("Nitro-9") are pruned separately by
+    # _prune_rare_keywords.
     keywords_by_cmc: dict[int, Counter] = field(default_factory=lambda: defaultdict(Counter))
+
+    # cmc -> keyword name -> list of real observed value/cost suffixes for
+    # that keyword at that cmc (one entry per occurrence, "" for a bare
+    # keyword with no parameter) -- e.g. "Ward" -> ["{1}", "{2}", "{2}", ...].
+    # Sampling from this (rather than printing the bare keyword name) is
+    # what keeps a generated "Ward" from showing up without its cost. See
+    # momir/text.py's generate_keywords.
+    keyword_values_by_cmc: dict[int, dict[str, list[str]]] = field(
+        default_factory=lambda: defaultdict(lambda: defaultdict(list))
+    )
 
     rarities: list[str] = field(default_factory=list)
 
@@ -203,8 +272,9 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
         if cmc is None:
             continue
         cmc = int(cmc)
+        oracle_text = card.get("oracle_text") or ""
 
-        for position, (sentence, shape) in enumerate(_extract_sentences(card.get("oracle_text"), name or "")):
+        for position, (sentence, shape) in enumerate(_extract_sentences(oracle_text, name or "")):
             corpus.sentences_by_cmc[cmc].append((sentence, min(position, MAX_SENTENCE_POSITION), shape))
 
         mana_cost = card.get("mana_cost")
@@ -219,12 +289,17 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
             corpus.subtypes_by_cmc[cmc][subtype] += 1
 
         for keyword in card.get("keywords") or []:
+            value = _keyword_occurrence(oracle_text, keyword, name or "")
+            if value is None:
+                continue
             corpus.keywords_by_cmc[cmc][keyword] += 1
+            corpus.keyword_values_by_cmc[cmc][keyword].append(value)
 
         rarity = card.get("rarity")
         if rarity:
             corpus.rarities.append(rarity)
 
+    _prune_rare_keywords(corpus)
     return corpus
 
 

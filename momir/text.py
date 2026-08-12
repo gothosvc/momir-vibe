@@ -3,7 +3,10 @@ Rules text generation: a blend of two techniques.
 
 - Keyword abilities (Flying, Trample, Deathtouch, ...) are sampled from the
   real frequency distribution of keywords seen on creatures at a similar
-  mana value, so mechanically the card is meaningful and "on curve".
+  mana value, so mechanically the card is meaningful and "on curve". Ones
+  that print with a value ("Ward {2}", "Cycling {1}{U}") get a real observed
+  value attached rather than showing up bare -- see corpus.py's
+  keyword_values_by_cmc.
 - Extra flavor rules text is generated with a word-level Markov chain
   trained on real oracle text, giving loose, evocative (but not mechanically
   binding) rules text. Momir-style play is honor-system anyway -- players
@@ -42,36 +45,54 @@ MIN_TRAINING_SENTENCES = 60
 MAX_BORROW_RADIUS = 32
 
 
-def _keyword_pool(corpus: Corpus, mana_value: int):
-    pool = corpus.keywords_by_cmc.get(mana_value)
-    if pool:
-        return pool
+def _keyword_cmc(corpus: Corpus, mana_value: int) -> int | None:
+    """The mana value to actually pull keyword data (names and values) from
+    -- the requested one if it has any, else the nearest one that does."""
+    if corpus.keywords_by_cmc.get(mana_value):
+        return mana_value
     available = [cmc for cmc, counter in corpus.keywords_by_cmc.items() if counter]
     if not available:
         return None
-    nearest = min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
-    return corpus.keywords_by_cmc[nearest]
+    return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
 
 
-def generate_keywords(corpus: Corpus, mana_value: int, rng: random.Random | None = None) -> list[str]:
+def _keyword_text(corpus: Corpus, cmc: int, name: str, card_name: str, rng: random.Random) -> str:
+    """The full printed keyword line, e.g. "Ward" -> "Ward {2}" -- sampled
+    from real observed values at this mana value so a keyword that always
+    prints with a cost/parameter never shows up bare. Values carry their own
+    leading whitespace (or lack of it) verbatim from the source card -- see
+    corpus.py's _keyword_occurrence -- so a plain concatenation reproduces
+    the real spacing either way. "~" substitution mirrors generate_rules_text."""
+    values = corpus.keyword_values_by_cmc.get(cmc, {}).get(name)
+    if not values:
+        return name
+    value = rng.choice(values)
+    text = f"{name}{value}" if value else name
+    return text.replace("~", card_name)
+
+
+def generate_keywords(
+    corpus: Corpus, mana_value: int, card_name: str, rng: random.Random | None = None
+) -> list[str]:
     rng = rng or random
-    pool = _keyword_pool(corpus, mana_value)
-    if not pool:
+    cmc = _keyword_cmc(corpus, mana_value)
+    if cmc is None:
         return []
 
     count = rng.choice(KEYWORD_COUNT_WEIGHTS)
     if count == 0:
         return []
 
-    keywords = list(pool.keys())
+    pool = corpus.keywords_by_cmc[cmc]
+    names = list(pool.keys())
     weights = list(pool.values())
 
     chosen: list[str] = []
-    for _ in range(min(count, len(keywords))):
-        pick = rng.choices(keywords, weights=weights)[0]
+    for _ in range(min(count, len(names))):
+        pick = rng.choices(names, weights=weights)[0]
         if pick not in chosen:
             chosen.append(pick)
-    return chosen
+    return [_keyword_text(corpus, cmc, name, card_name, rng) for name in chosen]
 
 
 def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[tuple[str, int, str]]:
