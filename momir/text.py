@@ -20,7 +20,10 @@ from .corpus import Corpus
 from .markov import WordMarkovChain
 
 KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasionally more
-EXTRA_TEXT_CHANCE = 0.55
+# ~97% of real creatures print some oracle text; 0.55 was making generated
+# cards noticeably blanker than that. Raised to sit closer to reality while
+# still leaving room for the occasional vanilla creature.
+EXTRA_TEXT_CHANCE = 0.85
 MAX_EXTRA_SENTENCES = 2
 
 # Word-chain order for rules text. Higher than the default (2) deliberately:
