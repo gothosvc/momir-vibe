@@ -4,8 +4,15 @@ A fake Magic: The Gathering creature card generator, built for Momir-style
 play: give it a mana value, get back a fully statted creature card that
 doesn't exist.
 
-Card **names** are generated with a character-level Markov chain trained on
-real creature names. **Rules text** is a mix of real keyword abilities
+Card **names** are generated one of two ways, matching how real creatures are
+named: ordinary creatures get species/role names ("Grizzly Bears", "Goblin
+Piker") assembled from real name words by a word-level Markov chain, so the
+result is always real English words in a new combination, never invented
+syllables; legendary creatures get personal character names ("Jace",
+"Chandra, Fire Artisan") from a character-level Markov chain, which *is*
+free to invent new syllables since that's how invented character names are
+supposed to sound. How often a generated card gets a character name mirrors
+how often real creatures are legendary. **Rules text** is a mix of real keyword abilities
 (sampled by how often they appear at that mana value) plus loose flavor text
 from a word-level Markov chain -- trained *only* on oracle text from real
 creatures at that same mana value (widening to nearby mana values only if
@@ -91,7 +98,7 @@ mana value X" part:
 data/fetch_cards.py   one-time Scryfall fetch -> data/cards_cache.json
 momir/corpus.py        loads the cache, builds training indices
 momir/markov.py        the generic Markov chain implementations
-momir/names.py         name generation (char-level Markov)
+momir/names.py         name generation (common: word-level Markov, character: char-level Markov)
 momir/text.py           rules text + keyword generation
 momir/colors.py         mana cost synthesis
 momir/stats.py          power/toughness sampling

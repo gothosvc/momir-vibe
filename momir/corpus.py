@@ -33,7 +33,15 @@ MAX_SENTENCE_POSITION = 2
 class Corpus:
     raw_cards: list[dict]
 
-    names: list[str] = field(default_factory=list)
+    # Real card names, split by naming style so name generation can favor
+    # ordinary English words ("Grizzly Bears", "Goblin Piker") and only
+    # occasionally reach for invented-sounding character names ("Jace",
+    # "Chandra"). A card counts as a "character" name if its type line is
+    # Legendary -- in practice that's reliably a personal name (with an
+    # optional epithet after a comma), vs. ordinary creatures which are
+    # named after their species/role. See momir/names.py.
+    character_names: list[str] = field(default_factory=list)
+    common_names: list[str] = field(default_factory=list)
     # cmc -> list of (sentence, position) pairs from creatures at that cmc,
     # where position is the sentence's index (0 = opener) within its source
     # card's oracle text, capped at MAX_SENTENCE_POSITION. Kept per-cmc
@@ -138,7 +146,14 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
     for card in raw_cards:
         name = card.get("name")
         if name:
-            corpus.names.append(name)
+            # Split/adventure cards ("Beanstalk Giant // Fertile Footsteps")
+            # carry their non-creature-face name in the same string -- train
+            # name generation on the creature face only.
+            primary_name = name.split(" // ")[0].strip()
+            if "Legendary" in (card.get("type_line") or ""):
+                corpus.character_names.append(primary_name)
+            else:
+                corpus.common_names.append(primary_name)
 
         cmc = card.get("cmc")
         if cmc is None:

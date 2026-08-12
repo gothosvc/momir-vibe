@@ -11,9 +11,9 @@ import random
 
 from . import colors, stats, text, types
 from .corpus import Corpus, get_corpus
-from .markov import CharMarkovChain, WordMarkovChain
+from .markov import WordMarkovChain
 from .models import Card
-from .names import build_name_chain
+from .names import NameChains, build_name_chains, generate_name
 
 RARITY_WEIGHTS = {"common": 40, "uncommon": 30, "rare": 20, "mythic": 10}
 MIN_MANA_VALUE = 0
@@ -23,7 +23,7 @@ MAX_MANA_VALUE = 16
 class CardGenerator:
     def __init__(self, corpus: Corpus | None = None) -> None:
         self.corpus = corpus or get_corpus()
-        self.name_chain: CharMarkovChain = build_name_chain(self.corpus)
+        self.name_chains: NameChains = build_name_chains(self.corpus)
         # One text chain per mana value, so a 1-drop's generated text is only
         # ever trained on what real 1-drops say -- see momir/text.py.
         self.text_chains: dict[int, WordMarkovChain] = text.build_text_chains(
@@ -49,7 +49,7 @@ class CardGenerator:
 
         rng = rng or random
 
-        name = self.name_chain.generate_title(rng=rng)
+        name = generate_name(self.name_chains, rng=rng)
         mana_cost = colors.synthesize_mana_cost(self.corpus, mana_value, rng=rng)
         symbols = colors.parse_symbols(mana_cost)
         card_colors = colors.colors_in_symbols(symbols)
