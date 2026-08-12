@@ -95,11 +95,20 @@ class WordMarkovChain:
 
     def __init__(self, order: int = 2) -> None:
         self.order = order
-        self._models: dict[str, dict[tuple[str, ...], Counter]] = defaultdict(lambda: defaultdict(Counter))
-        # (shape, position) -> start keys seen there. position 0 = opener,
-        # 1 = second sentence, etc. Only position-0 sentences should ever be
-        # offered as a chain *opener*.
-        self._starts: dict[tuple[str, int], list[tuple[str, ...]]] = defaultdict(list)
+        # Transitions are modeled separately per (shape, position), not just
+        # per shape: sharing transitions across positions within a shape was
+        # a bug (see train()'s comment) that let a continuation clause like
+        # "When you do, ..." get drawn as a first line, because after a
+        # legitimate position-0 opening word ("When"), the *next* word was
+        # still being pulled from a table pooling every position's "When
+        # ___" continuations together.
+        self._models: dict[tuple[str, int], dict[tuple[str, ...], Counter]] = defaultdict(
+            lambda: defaultdict(Counter)
+        )
+        # (shape, position) -> real first words seen opening a sentence
+        # there (one entry per occurrence, so rng.choice naturally weights
+        # by real frequency). position 0 = opener, 1 = second sentence, etc.
+        self._starts: dict[tuple[str, int], list[str]] = defaultdict(list)
         # shape -> number of sentences trained, used to weight shape choice
         # at generation time by how common that construct actually is.
         self._shape_counts: Counter = Counter()
@@ -110,10 +119,14 @@ class WordMarkovChain:
             if len(words) < self.order + 1:
                 continue
             padded = [START] * self.order + words + [END]
-            start_key = tuple(padded[: self.order])
-            self._starts[(shape, position)].append(start_key)
+            self._starts[(shape, position)].append(words[0])
             self._shape_counts[shape] += 1
-            model = self._models[shape]
+            # Scoped by (shape, position), not just shape -- see __init__.
+            # Sharing this table across positions would let e.g. a real
+            # position-0 opener's second word be drawn from what actually
+            # followed that same word on a position-2 continuation clause
+            # elsewhere, defeating the point of tracking position at all.
+            model = self._models[(shape, position)]
             for i in range(len(padded) - self.order):
                 key = tuple(padded[i : i + self.order])
                 nxt = padded[i + self.order]
@@ -145,13 +158,22 @@ class WordMarkovChain:
         # Fall back to the opener pool (always the best-populated) if this
         # position wasn't seen often enough at this mana value to have its
         # own starts -- e.g. a sparse mana value borrowing neighbor sentences.
-        starts = self._starts.get((shape, position)) or self._starts.get((shape, 0))
-        if not starts:
+        # The model lookup below follows the same fallback (not the
+        # originally requested position) so a word's continuation always
+        # comes from the same position bucket its first word did.
+        first_words = self._starts.get((shape, position))
+        if not first_words:
+            first_words = self._starts.get((shape, 0))
+            position = 0
+        if not first_words:
             return ""
-        model = self._models[shape]
-        key = rng.choice(starts)
-        out: list[str] = []
-        for _ in range(max_words):
+        model = self._models[(shape, position)]
+        first_word = rng.choice(first_words)
+        out: list[str] = [first_word]
+        # The key a normal walk would be in right after emitting the real
+        # first word: order-1 START placeholders followed by that word.
+        key = (START,) * (self.order - 1) + (first_word,)
+        for _ in range(max_words - 1):
             choices = model.get(key)
             if not choices:
                 break

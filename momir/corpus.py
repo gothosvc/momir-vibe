@@ -254,27 +254,46 @@ def _normalize_self_references(text: str, name: str) -> str:
     return text
 
 
-def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[str, str]]:
-    """Returns (sentence, shape) pairs; see _sentence_shape."""
+def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[str, int, str]]:
+    """Returns (sentence, position, shape) triples; see _sentence_shape.
+
+    `position` counts every real candidate sentence in printed order --
+    including ones dropped from training below (template fragments, quoted
+    sub-abilities) -- not just the ones that made it through filtering. A
+    sentence that presupposes an earlier real clause ("When you do, ...")
+    needs to keep the position that reflects that, even when we chose not
+    to train on the clause it presupposes; numbering based only on what
+    survived filtering would let it collapse down to position 0 and get
+    offered up as if it were a real opener. (Real case that surfaced this:
+    Dáin Ironfoot's first sentence quotes a granted ability and gets
+    dropped, and without this, "When you do, attach it to target creature
+    you control." would shift into position 0.)"""
     if not oracle_text:
         return []
     sentences = []
+    position = 0
     for line in oracle_text.split("\n"):
         line = _REMINDER_TEXT_RE.sub("", line).strip()
-        if not line or _is_template_fragment(line):
+        if not line:
+            continue
+        if _is_template_fragment(line):
+            position += 1
             continue
         if name:
             line = _normalize_self_references(line, name)
         for sentence in _SENTENCE_SPLIT_RE.split(line):
             sentence = sentence.strip()
+            if not sentence:
+                continue
             # Self-quoted sub-abilities ('...has "Whenever this creature
             # attacks, ..."') pair an opening and closing quote that can
             # land in different sentences (or get sentence-split apart
             # entirely) -- word-splicing has no way to keep them balanced,
             # so quoted sentences are dropped rather than left to produce
             # stray dangling quote marks.
-            if sentence and '"' not in sentence:
-                sentences.append((sentence, _sentence_shape(sentence)))
+            if '"' not in sentence:
+                sentences.append((sentence, position, _sentence_shape(sentence)))
+            position += 1
     return sentences
 
 
@@ -308,7 +327,7 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
         cmc = int(cmc)
         oracle_text = card.get("oracle_text") or ""
 
-        for position, (sentence, shape) in enumerate(_extract_sentences(oracle_text, name or "")):
+        for sentence, position, shape in _extract_sentences(oracle_text, name or ""):
             corpus.sentences_by_cmc[cmc].append((sentence, min(position, MAX_SENTENCE_POSITION), shape))
 
         mana_cost = card.get("mana_cost")
