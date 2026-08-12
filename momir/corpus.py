@@ -97,12 +97,24 @@ def _keyword_occurrence(oracle_text: str, keyword: str, name: str = "") -> str |
     directly ("Ward—Pay 2 life"), an ability word gets a space on both sides
     ("Landfall — Whenever ..."). Keeping the leading whitespace (or lack of
     it) verbatim reproduces whichever one the source card actually used,
-    rather than guessing."""
-    text = _REMINDER_TEXT_RE.sub("", oracle_text)
-    if name:
-        text = _normalize_self_references(text, name)
-    match = re.search(rf"\b{re.escape(keyword)}\b([^,.;\n]*)", text, re.IGNORECASE)
-    return match.group(1).rstrip() if match else None
+    rather than guessing.
+
+    Searched line by line (skipping template-fragment and quoted lines, same
+    screening _extract_sentences applies to sentence training -- see
+    _is_template_fragment) rather than across the whole text at once, so a
+    keyword that happens to also appear inside e.g. a Choose-one bullet or a
+    granted-ability's quoted sub-text on this card doesn't have that
+    fragment's mismatched context captured as its value."""
+    for line in _REMINDER_TEXT_RE.sub("", oracle_text).split("\n"):
+        line = line.strip()
+        if not line or _is_template_fragment(line) or '"' in line:
+            continue
+        if name:
+            line = _normalize_self_references(line, name)
+        match = re.search(rf"\b{re.escape(keyword)}\b([^,.;]*)", line, re.IGNORECASE)
+        if match:
+            return match.group(1).rstrip()
+    return None
 
 
 def _prune_rare_keywords(corpus: Corpus) -> None:
@@ -202,23 +214,33 @@ def _extract_subtypes(type_line: str) -> list[str]:
     return subtypes.split()
 
 
+_THE_EPITHET_RE = re.compile(r"^([A-Za-z][\w'-]*) the ")
+
+
 def _self_reference_patterns(name: str) -> list[str]:
     """Strings within a card's own oracle text that refer back to itself, longest
     first so e.g. a full "Adeline, Resplendent Cathar" match wins out over the
     "Adeline" short form it contains. Split/adventure names ("Beanstalk Giant //
     Fertile Footsteps") contribute a pattern per face; legendary subtitles
-    ("Aang, A Lot to Learn") contribute the pre-comma short name too, since
-    real oracle text refers to itself that way (see corpus.py's cached
-    "Aang has vigilance..." example)."""
+    contribute a short "call name" too, since real oracle text refers to
+    itself that way -- both the comma convention ("Aang, A Lot to Learn"
+    refers to itself as "Aang") and the "the" epithet convention ("Eron the
+    Relentless" refers to itself as "Eron"; "Regenerate Eron." is real
+    printed text). The epithet short form is restricted to a single leading
+    word so it doesn't misfire on an ordinary multi-word name that merely
+    contains " the " deeper in a longer type of subtitle."""
     patterns: set[str] = set()
     for face in name.split(" // "):
         face = face.strip()
         if not face:
             continue
         patterns.add(face)
-        short = face.split(",")[0].strip()
-        if short:
-            patterns.add(short)
+        comma_short = face.split(",")[0].strip()
+        if comma_short:
+            patterns.add(comma_short)
+        epithet_match = _THE_EPITHET_RE.match(face)
+        if epithet_match:
+            patterns.add(epithet_match.group(1))
     return sorted(patterns, key=len, reverse=True)
 
 
