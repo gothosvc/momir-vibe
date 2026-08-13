@@ -57,21 +57,9 @@ Serves at `http://127.0.0.1:8000`. Interactive docs at `/docs`.
 - `GET /momir/match?mana_value=4` — two cards generated off the same mana value, one per player.
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
 
-Both generation endpoints also take an optional `format` param --
-`standard`, `pioneer`, or `modern` -- to restrict training data to cards
-legal in that format, so generated cards feel like they belong to that
-format's card pool rather than Magic's full 30-year history. Omit it for the
-full, unrestricted pool. (Legacy/Vintage aren't offered as filters: creatures
-are almost never banned there, so it'd barely narrow the pool at all --
-~99% of all creatures are legal in both.) Each format's corpus and Markov
-chains are trained lazily on first request and cached from then on, same as
-the unrestricted pool trained eagerly at startup.
+Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool. (Legacy/Vintage aren't offered as filters because creatures are almost never banned there, so it'd barely narrow the pool at all -- ~99% of all creatures are legal in both) Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
 
-Note that a Standard-scoped corpus is only as fresh as the last
-`data/fetch_cards.py` run -- Standard rotates sets out over time, and this
-project never re-fetches on its own, so re-run the fetch occasionally if
-you're using `format=standard`. Modern/Pioneer don't have this problem
-(bans are rare and don't expire).
+Note that a Standard-scoped corpus is only as fresh as the last `data/fetch_cards.py` run -- Standard rotates sets out over time, and this project never re-fetches on its own, so re-run the fetch occasionally if you're using `format=standard`. Modern/Pioneer don't have this problem asbans are rare and don't expire.
 
 Example:
 
