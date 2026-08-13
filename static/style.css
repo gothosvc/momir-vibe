@@ -1,0 +1,257 @@
+:root {
+  --page-bg: #1b1b1f;
+  --page-fg: #e8e6e1;
+  --muted: #9a978f;
+  --accent: #c9a24b;
+
+  /* MTG-ish frame colors, one custom property set per card color so the
+     card frame just switches palettes via a class -- see .card.<color>. */
+  --frame-border: #000;
+  --text-box-bg: #f4f0e6;
+  --text-box-fg: #14110c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2.5rem 1rem 4rem;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  background: #26262c;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+}
+
+.controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.controls input {
+  width: 5rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #454550;
+  background: #1b1b1f;
+  color: var(--page-fg);
+  font-size: 1rem;
+}
+
+.controls button {
+  padding: 0.55rem 1.25rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: #1b1b1f;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.controls button:hover {
+  filter: brightness(1.08);
+}
+
+.controls button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: #ff8a80;
+  background: #3a1f1f;
+  border: 1px solid #6b2f2f;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  max-width: 340px;
+  text-align: center;
+}
+
+/* --- Card frame --- */
+
+.card {
+  width: 340px;
+  border-radius: 18px;
+  padding: 14px;
+  border: 3px solid var(--frame-border);
+  background: linear-gradient(160deg, var(--frame-a), var(--frame-b));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  font-family: Georgia, "Times New Roman", serif;
+  color: #1b1b1f;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.35);
+  margin-bottom: 0.5rem;
+}
+
+.card-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-mana {
+  display: flex;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #d8d2c2;
+  border: 1px solid #14110c;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #14110c;
+}
+
+.pip-w { background: #f8f4e3; }
+.pip-u { background: #6ea3d8; }
+.pip-b { background: #8a7f8a; }
+.pip-r { background: #e79a7c; }
+.pip-g { background: #8fbf8f; }
+.pip-generic { background: #d8d2c2; }
+.pip-hybrid { background: linear-gradient(90deg, #f8f4e3, #6ea3d8); }
+
+.card-art {
+  height: 150px;
+  border-radius: 6px;
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  margin-bottom: 0.5rem;
+  background: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.12) 0 12px,
+      rgba(0, 0, 0, 0.08) 12px 24px
+    ),
+    linear-gradient(160deg, var(--frame-a), var(--frame-b));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-art-label {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(20, 17, 12, 0.45);
+}
+
+.card-type {
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.35);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-text-box {
+  position: relative;
+  background: var(--text-box-bg);
+  color: var(--text-box-fg);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  padding: 0.65rem 0.7rem 1.4rem;
+  min-height: 90px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.card-text p {
+  margin: 0 0 0.4rem;
+}
+
+.card-text p:last-child {
+  margin-bottom: 0;
+}
+
+.card-text p.keyword-line {
+  font-weight: 700;
+}
+
+.card-pt {
+  position: absolute;
+  right: 0.5rem;
+  bottom: -0.55rem;
+  background: #d8d2c2;
+  border: 2px solid #14110c;
+  border-radius: 6px;
+  padding: 0.15rem 0.55rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.card-meta {
+  margin-top: 0.7rem;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.65rem;
+  color: rgba(20, 17, 12, 0.65);
+  text-align: center;
+}
+
+/* Color frames */
+.card.white   { --frame-a: #f8f4e3; --frame-b: #e5dcb8; }
+.card.blue    { --frame-a: #aecbea; --frame-b: #4f7fb3; }
+.card.black   { --frame-a: #9a8fa0; --frame-b: #3a3340; }
+.card.red     { --frame-a: #f0b79c; --frame-b: #c1502f; }
+.card.green   { --frame-a: #b6d9ae; --frame-b: #4c7a45; }
+.card.gold    { --frame-a: #f1dfa0; --frame-b: #c9a24b; }
+.card.colorless { --frame-a: #d6d3ca; --frame-b: #9a978f; }
