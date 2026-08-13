@@ -129,6 +129,23 @@ def build_text_chains(corpus: Corpus, mana_values: range) -> dict[int, WordMarko
     return chains
 
 
+# Verbs that always open a directive clause needing a completed object
+# ("return TARGET CREATURE to its owner's hand", "tap target creature") --
+# see _is_complete_sentence's dangling-object check. Deliberately excludes
+# ambiguous words like "counter" (usually the noun in "+1/+1 counter", only
+# occasionally the verb "counter target spell") where the false-positive
+# rate from misreading the noun would outweigh the real catches.
+_DANGLING_OBJECT_VERBS = {"return", "exile", "destroy", "tap", "untap", "sacrifice", "bounce", "regenerate"}
+# Words that resolve a dangling verb's object phrase -- once one of these
+# shows up, the clause has somewhere for its object to land.
+_OBJECT_RESOLVERS = {"to", "from", "under", "instead"}
+# Verbs that only make sense introducing a *new* clause's own subject
+# ("...creature you control GETS +2/+2", "...you control DIES"). Real oracle
+# text pairs these only with a subject that was never anyone else's object,
+# so one showing up while a verb's object is still unresolved is a splice.
+_CLAUSE_SUBJECT_VERBS = {"gets", "get", "gains", "gain", "dies", "die", "attacks", "attack", "enters", "enter", "deals", "deal"}
+
+
 def _is_complete_sentence(sentence: str) -> bool:
     """Backstop against generations that never actually reached a genuine
     sentence end. Every trained sentence carries its own real terminal
@@ -139,13 +156,36 @@ def _is_complete_sentence(sentence: str) -> bool:
     stapled onto whatever word it happened to stop on (".../, and.",
     "...play that."). Also catches the same double-colon/bullet/pipe tells
     as before -- most commonly two same-shape activated-ability clauses
-    fusing into a double "cost: effect: effect"."""
+    fusing into a double "cost: effect: effect".
+
+    Also catches a subtler splice that still ends cleanly: a sentence that
+    opens a directive verb's object ("return a black creature you control")
+    but, before that object ever resolves (a preposition, a comma, a new
+    clause), gets hijacked mid-object by an unrelated clause's verb ("...gets
+    +2/+0 until end of turn"). This happens because two real sentences --
+    "Return another creature you control to its owner's hand." and "Another
+    creature you control gets +2/+2 until end of turn." -- share the long
+    common run "creature you control", which is enough real match at any
+    Markov order to walk from one straight into the other: the chain has no
+    memory that "return" back at the start of the clause is still waiting on
+    an object once it's a few words further along. See momir/markov.py."""
     if not sentence.endswith((".", "!", "?")):
         return False
     if sentence.count(":") >= 2:
         return False
     if "•" in sentence or "|" in sentence:
         return False
+    dangling = False
+    for word in sentence.split():
+        core = word.strip(".,!?:;").lower()
+        if dangling and core in _CLAUSE_SUBJECT_VERBS:
+            return False
+        if core in _DANGLING_OBJECT_VERBS:
+            dangling = True
+        elif core in _OBJECT_RESOLVERS:
+            dangling = False
+        if any(punct in word for punct in ",:.!?"):
+            dangling = False
     return True
 
 
