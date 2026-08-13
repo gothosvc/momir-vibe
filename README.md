@@ -49,10 +49,13 @@ python -m data.fetch_cards
 python -m momir.main
 ```
 
-Serves at `http://127.0.0.1:8000`. Interactive docs at `/docs`.
+Serves at `http://127.0.0.1:8000` — open it in a browser for a small card
+mockup page (mana value input + Generate button, rendered into a CSS card
+frame). Interactive API docs at `/docs`.
 
 ### Endpoints
 
+- `GET /` — the card mockup web page (`static/`).
 - `GET /cards/generate?mana_value=4` — one generated creature card at that mana value (0-16).
 - `GET /momir/match?mana_value=4` — two cards generated off the same mana value, one per player.
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
@@ -100,6 +103,7 @@ momir/card_builder.py   ties it all together into a Card
 momir/models.py         pydantic Card / MatchPair schemas
 momir/api.py            FastAPI app + routes
 momir/main.py           uvicorn entrypoint
+static/                 card mockup web page (vanilla HTML/CSS/JS, no build step)
 ```
 
 ## Notes / limitations

@@ -1,22 +1,27 @@
 """
 The local API server.
 
-    GET /cards/generate?mana_value=4   -> a single generated Card
-    GET /momir/match?mana_value=4      -> a Card for each of two players
-    GET /health                        -> liveness check
+    GET /                               -> the card-mockup web page (static/)
+    GET /cards/generate?mana_value=4    -> a single generated Card
+    GET /momir/match?mana_value=4       -> a Card for each of two players
+    GET /health                         -> liveness check
+    GET /docs                           -> interactive API docs (Swagger UI)
 
 Run with:  python -m momir.main   (see main.py)
 """
 from __future__ import annotations
 
+import pathlib
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from .card_builder import MAX_MANA_VALUE, MIN_MANA_VALUE, get_generator
 from .corpus import SUPPORTED_FORMATS, get_corpus
 from .models import Card, MatchPair
+
+STATIC_DIR = pathlib.Path(__file__).parent.parent / "static"
 
 app = FastAPI(
     title="Momir Vibe",
@@ -42,11 +47,6 @@ FORMAT_QUERY = Query(
     None,
     description="Restrict training data to cards legal in this format. Omit for the full, unrestricted card pool.",
 )
-
-
-@app.get("/", include_in_schema=False)
-def root() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
@@ -78,3 +78,10 @@ def generate_match(mana_value: int = MANA_VALUE_QUERY, format: Format | None = F
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# Mounted last and at "/" so it only ever catches requests the routes above
+# didn't -- everything under static/ (index.html at "/", plus style.css /
+# app.js by filename), same-origin with the API so the page's fetch() calls
+# need no CORS setup.
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
