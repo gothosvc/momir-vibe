@@ -1,8 +1,6 @@
 # Momir Vibe
 
-A fake Magic: The Gathering creature card generator, built for Momir-style
-play: give it a mana value, get back a fully statted creature card that
-doesn't exist.
+A vibe-coded Magic: The Gathering creature card generator, built for Momir-style play. Give it a mana value, get back a randomly-generated, fully-statted creature card that doesn't exist.
 
 ## Details
 
@@ -72,20 +70,18 @@ curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
 
 ```json
 {
-  "name": "Bird Avenger",
-  "mana_cost": "{2}{W}",
-  "mana_value": 3,
-  "colors": ["W"],
-  "type_line": "Creature — Bird",
-  "power": 3,
-  "toughness": 2,
-  "keywords": [],
-  "rules_text": ["This creature enters tapped."],
-  "rarity": "common",
-  "set_name": "Momir Vibe",
-  "collector_number": "4",
+  "name":"Treetop Freedom Fighters",
+  "mana_cost":"{3}",
+  "mana_value":3,
+  "colors":[],
+  "color_identity":[],
+  "type_line":"Creature — Human Druid",
+  "power":2,
+  "toughness":3,
+  "keywords":["Indestructible"],
+  "rules_text":["When this creature enters, put a +1/+1 counter on target creature."],
   ...
-}
+  }
 ```
 
 ## Project layout
