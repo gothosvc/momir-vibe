@@ -7,6 +7,7 @@ an individual card is then cheap and can happen on every API request.
 """
 from __future__ import annotations
 
+import functools
 import random
 
 from . import colors, stats, text, types
@@ -73,3 +74,12 @@ class CardGenerator:
             rarity=self._rarity(rng),
             collector_number=self._collector_number(),
         )
+
+
+@functools.lru_cache(maxsize=None)
+def get_generator(legal_in: str | None = None) -> CardGenerator:
+    """One process-wide singleton per `legal_in` value (see corpus.py's
+    SUPPORTED_FORMATS) -- building a CardGenerator means training every
+    Markov chain, which is the expensive part, so each distinct format is
+    only ever built once per server run rather than per request."""
+    return CardGenerator(get_corpus(legal_in=legal_in))

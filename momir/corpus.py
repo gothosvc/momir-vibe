@@ -16,6 +16,13 @@ from dataclasses import dataclass, field
 
 CACHE_PATH = pathlib.Path(__file__).parent.parent / "data" / "cards_cache.json"
 
+# Formats build_corpus can restrict training data to (see its `legal_in`
+# param). Keep in sync with data/fetch_cards.py's TRACKED_FORMATS -- that's
+# what actually populates each cached card's "legal_formats" list; a format
+# named here that wasn't tracked at fetch time would just silently produce
+# an empty corpus.
+SUPPORTED_FORMATS = ("standard", "pioneer", "modern")
+
 _REMINDER_TEXT_RE = re.compile(r"\([^)]*\)")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -305,8 +312,16 @@ def _load_raw() -> list[dict]:
     return json.loads(CACHE_PATH.read_text())
 
 
-def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
+def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = None) -> Corpus:
+    """`legal_in`, if given, restricts training data to cards legal in that
+    format (see SUPPORTED_FORMATS) -- e.g. "modern" trains only on cards
+    legal in Modern, so generated cards feel like they belong to that
+    format's card pool rather than Magic's full 30-year history."""
     raw_cards = raw_cards if raw_cards is not None else _load_raw()
+    if legal_in is not None:
+        if legal_in not in SUPPORTED_FORMATS:
+            raise ValueError(f"Unsupported format {legal_in!r}; choose from {SUPPORTED_FORMATS}")
+        raw_cards = [card for card in raw_cards if legal_in in (card.get("legal_formats") or [])]
     corpus = Corpus(raw_cards=raw_cards)
 
     for card in raw_cards:
@@ -332,7 +347,10 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
 
         mana_cost = card.get("mana_cost")
         if mana_cost:
-            corpus.mana_costs_by_cmc[cmc].append(mana_cost)
+            # Split/adventure cards ("{5}{B} // {1}{B}") carry both faces'
+            # costs in one string, same as their name and type_line -- use
+            # the creature face's cost only.
+            corpus.mana_costs_by_cmc[cmc].append(mana_cost.split(" // ")[0].strip())
 
         power, toughness = _numeric(card.get("power")), _numeric(card.get("toughness"))
         if power is not None and toughness is not None:
@@ -357,6 +375,14 @@ def build_corpus(raw_cards: list[dict] | None = None) -> Corpus:
 
 
 @functools.lru_cache(maxsize=1)
-def get_corpus() -> Corpus:
-    """Process-wide singleton so training only happens once per server run."""
-    return build_corpus()
+def _get_raw_cards() -> list[dict]:
+    """The full cached card list, read from disk once regardless of how many
+    different `legal_in` corpora end up getting built from it."""
+    return _load_raw()
+
+
+@functools.lru_cache(maxsize=None)
+def get_corpus(legal_in: str | None = None) -> Corpus:
+    """One process-wide singleton per `legal_in` value, so training for a
+    given format only happens once per server run -- see build_corpus."""
+    return build_corpus(_get_raw_cards(), legal_in=legal_in)

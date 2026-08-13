@@ -31,8 +31,8 @@ HEADERS = {
 QUERY = "type:creature game:paper -is:funny"
 
 # Fields we actually need to train the generator. Scryfall cards carry a lot
-# of printing-specific metadata (set, image URIs, prices, legality, ...) that
-# we don't want to store or train on.
+# of printing-specific metadata (set, image URIs, prices, ...) that we don't
+# want to store or train on.
 KEEP_FIELDS = (
     "name",
     "mana_cost",
@@ -46,6 +46,35 @@ KEEP_FIELDS = (
     "rarity",
 )
 
+# Formats corpus.py can filter the training data down to (see its
+# SUPPORTED_FORMATS -- keep the two in sync if this changes). Scryfall's full
+# `legalities` object has ~15 formats; we only ever want a handful, so we
+# trim it down to a plain list of "legal in" names at fetch time rather than
+# storing the whole dict per card.
+TRACKED_FORMATS = ("standard", "pioneer", "modern")
+
+
+MAX_RETRIES = 8
+MAX_BACKOFF_SECONDS = 30
+
+
+def _get_with_retry(url: str, params: dict | None) -> dict:
+    """Scryfall's rate limit is a soft, bursty one -- a 429 here means back
+    off and retry rather than give up, since the inter-request sleep below
+    is only a courtesy minimum, not a guarantee against ever tripping it
+    (it seems to deplete over a sustained run even while staying under
+    that per-request minimum, rather than being a hard immediate block)."""
+    for attempt in range(MAX_RETRIES):
+        resp = requests.get(url, params=params, headers=HEADERS, timeout=30)
+        if resp.status_code == 429 and attempt < MAX_RETRIES - 1:
+            wait = min(2**attempt, MAX_BACKOFF_SECONDS)
+            print(f"  Rate limited, retrying in {wait}s...")
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise RuntimeError("unreachable")  # loop always returns or raises
+
 
 def fetch_all(max_cards: int | None = None) -> list[dict]:
     cards: list[dict] = []
@@ -53,9 +82,7 @@ def fetch_all(max_cards: int | None = None) -> list[dict]:
     params: dict | None = {"q": QUERY, "unique": "cards", "order": "name"}
 
     while url:
-        resp = requests.get(url, params=params, headers=HEADERS, timeout=30)
-        resp.raise_for_status()
-        payload = resp.json()
+        payload = _get_with_retry(url, params)
 
         for raw in payload.get("data", []):
             # Skip double-faced/split cards' front-only weirdness and cards
@@ -63,6 +90,8 @@ def fetch_all(max_cards: int | None = None) -> list[dict]:
             if "power" not in raw or "toughness" not in raw:
                 continue
             trimmed = {k: raw.get(k) for k in KEEP_FIELDS}
+            legalities = raw.get("legalities") or {}
+            trimmed["legal_formats"] = [fmt for fmt in TRACKED_FORMATS if legalities.get(fmt) == "legal"]
             cards.append(trimmed)
 
         if max_cards is not None and len(cards) >= max_cards:
@@ -75,8 +104,10 @@ def fetch_all(max_cards: int | None = None) -> list[dict]:
         else:
             url = None
 
-        # Be polite to Scryfall's API (they ask for 50-100ms between requests).
-        time.sleep(0.1)
+        # Be polite to Scryfall's API (they ask for 50-100ms between
+        # requests; leaning toward the slower end since the retry loop above
+        # shows the limit can still get tripped over a long sustained run).
+        time.sleep(0.15)
 
     return cards
 
