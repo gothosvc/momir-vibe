@@ -146,7 +146,7 @@ _OBJECT_RESOLVERS = {"to", "from", "under", "instead"}
 _CLAUSE_SUBJECT_VERBS = {"gets", "get", "gains", "gain", "dies", "die", "attacks", "attack", "enters", "enter", "deals", "deal"}
 
 
-def _is_complete_sentence(sentence: str) -> bool:
+def _is_complete_sentence(sentence: str, shape: str | None) -> bool:
     """Backstop against generations that never actually reached a genuine
     sentence end. Every trained sentence carries its own real terminal
     punctuation (that's how corpus.py split sentences out of oracle text in
@@ -168,12 +168,31 @@ def _is_complete_sentence(sentence: str) -> bool:
     common run "creature you control", which is enough real match at any
     Markov order to walk from one straight into the other: the chain has no
     memory that "return" back at the start of the clause is still waiting on
-    an object once it's a few words further along. See momir/markov.py."""
+    an object once it's a few words further along. See momir/markov.py.
+
+    Also enforces the structural punctuation each shape is defined by (see
+    corpus.py's _sentence_shape): every real trigger sentence is a condition
+    clause, a comma, then an effect ("Whenever X, Y."), and every real
+    activated-ability sentence is a cost, a colon, then an effect ("Cost:
+    Y."). A chain that walks straight from the condition/cost into a
+    same-tail effect clause without ever emitting that separator -- for the
+    same reason as the splice above -- produces a sentence that's actually
+    just the condition or cost alone with an effect's tail bolted on, e.g.
+    "Whenever an equipped creature you control gets +3/+0 until end of
+    turn." (missing the actual triggering event and its comma) or "{2},
+    Exile a creature card from your graveyard to the battlefield." (missing
+    the colon and the ability that cost was for). Checked directly against
+    `shape` rather than re-deriving it from the text, since the caller
+    already knows which one was requested."""
     if not sentence.endswith((".", "!", "?")):
         return False
     if sentence.count(":") >= 2:
         return False
     if "•" in sentence or "|" in sentence:
+        return False
+    if shape == "trigger" and "," not in sentence:
+        return False
+    if shape == "activated" and ":" not in sentence:
         return False
     dangling = False
     for word in sentence.split():
@@ -209,7 +228,7 @@ def generate_rules_text(
         sentence = ""
         for _ in range(SENTENCE_ATTEMPTS):
             candidate = chain.generate(max_words=MAX_SENTENCE_WORDS, rng=rng, position=position, shape=shape)
-            if candidate and _is_complete_sentence(candidate):
+            if candidate and _is_complete_sentence(candidate, shape):
                 sentence = candidate
                 break
         if not sentence:
