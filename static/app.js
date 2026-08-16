@@ -39,15 +39,24 @@ function renderCard(card) {
   // match -- unrelated to this card's name/text, just a plausible-looking
   // picture (see momir/art.py). Falls back to the plain label when the
   // corpus has no art data (see momir/models.py's Card.art_url docstring).
+  const artBox = document.getElementById("card-art");
   const artImage = document.getElementById("card-art-image");
   const artLabel = document.getElementById("card-art-label");
   if (card.art_url) {
+    // Scryfall art_crop images vary in aspect ratio per card, so the box's
+    // ratio is set from the image's actual dimensions once it loads --
+    // that keeps object-fit: cover from ever having to crop real content.
+    artImage.onload = () => {
+      artBox.style.aspectRatio = `${artImage.naturalWidth} / ${artImage.naturalHeight}`;
+    };
     artImage.src = card.art_url;
     artImage.hidden = false;
     artLabel.hidden = true;
   } else {
     artImage.hidden = true;
     artImage.removeAttribute("src");
+    artImage.onload = null;
+    artBox.style.aspectRatio = "";
     artLabel.hidden = false;
   }
 
