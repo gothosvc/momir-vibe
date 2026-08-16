@@ -140,15 +140,22 @@ def build_text_chains(corpus: Corpus, mana_values: range) -> dict[int, WordMarko
 
 
 # Verbs that always open a directive clause needing a completed object
-# ("return TARGET CREATURE to its owner's hand", "tap target creature") --
-# see _is_complete_sentence's dangling-object check. Deliberately excludes
-# ambiguous words like "counter" (usually the noun in "+1/+1 counter", only
-# occasionally the verb "counter target spell") where the false-positive
-# rate from misreading the noun would outweigh the real catches.
-_DANGLING_OBJECT_VERBS = {"return", "exile", "destroy", "tap", "untap", "sacrifice", "bounce", "regenerate"}
+# ("return TARGET CREATURE to its owner's hand", "tap target creature",
+# "put a -1/-1 counter ON IT") -- see _is_complete_sentence's dangling-object
+# check. Deliberately excludes ambiguous words like "counter" (usually the
+# noun in "+1/+1 counter", only occasionally the verb "counter target
+# spell") where the false-positive rate from misreading the noun would
+# outweigh the real catches.
+_DANGLING_OBJECT_VERBS = {"return", "exile", "destroy", "tap", "untap", "sacrifice", "bounce", "regenerate", "put"}
 # Words that resolve a dangling verb's object phrase -- once one of these
-# shows up, the clause has somewhere for its object to land.
-_OBJECT_RESOLVERS = {"to", "from", "under", "instead"}
+# shows up, the clause has somewhere for its object to land. "and"/"or" are
+# in here for "put"'s sake: real oracle text routinely resolves its object
+# by coordinating a whole new clause onto it rather than a preposition
+# ("put a +1/+1 counter on this creature AND you gain 1 life", "...counter
+# on this creature OR this creature gains flying") -- without treating that
+# as a resolver too, those real, common sentences would misfire the same
+# check meant to catch the splice.
+_OBJECT_RESOLVERS = {"to", "from", "under", "instead", "and", "or"}
 # Verbs that only make sense introducing a *new* clause's own subject
 # ("...creature you control GETS +2/+2", "...you control DIES", "...you
 # control BECOME 3/3 artifact creatures", "...creatures you control HAVE
