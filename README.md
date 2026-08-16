@@ -55,6 +55,9 @@ frame). Interactive API docs at `/docs`.
 
 - `GET /` — the card mockup web page (`static/`).
 - `GET /cards/generate?mana_value=4` — one generated creature card at that mana value (0-16).
+- `GET /cards/decode?code=...` — reconstruct a card from its `share_code` (see "Saving and sharing cards" below).
+- `POST /cards/save` — body `{"share_code": "..."}`; persists it server-side and returns `{"id": "..."}`.
+- `GET /c/{id}` — the card saved under that short id.
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
 
 Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool. (Legacy/Vintage aren't offered as filters because creatures are almost never banned there, so it'd barely narrow the pool at all -- ~99% of all creatures are legal in both) Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
@@ -83,6 +86,17 @@ curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
   }
 ```
 
+### Saving and sharing cards
+
+Every generated `Card` carries a `share_code` — a compact string (version tag + zlib-compressed, base64url-encoded JSON of the card's fields) that fully encodes the card. `GET /cards/decode?code=...` turns one back into the exact same `Card`, with no regeneration and no dependency on the corpus or Markov chains being unchanged since the card was made (see `momir/codec.py`).
+
+That one primitive backs two things in the web page:
+
+- **Save** — the ★ button keeps a card's `share_code` (plus its already-generated fields, so the list renders without a round trip) in the browser's `localStorage`. Nothing server-side is involved, so this costs nothing to run and never expires.
+- **Share** — the "Copy link" button first tries `POST /cards/save`, which persists the `share_code` in a local SQLite DB (`data/saved_cards.db`, gitignored, created automatically) keyed by a short content-addressed id (`sha256(share_code)[:10]`, so saving the same card twice is a no-op), giving a short `?id=...` link. If that request fails for any reason, it falls back to the long but still fully self-contained `?card=<share_code>` link, which needs no server-side state at all.
+
+The SQLite DB is a lookup cache, not a source of truth — every row is just `id -> share_code`, and any `share_code` you still have decodes correctly even if the DB were deleted. There's currently no eviction of old rows.
+
 ## Project layout
 
 ```
@@ -95,6 +109,8 @@ momir/colors.py         mana cost synthesis
 momir/stats.py          power/toughness sampling
 momir/types.py          creature type line generation
 momir/card_builder.py   ties it all together into a Card
+momir/codec.py           encode/decode a Card to/from its share_code
+momir/store.py           SQLite-backed short-id lookup for shared cards
 momir/models.py         pydantic Card schema + request/response shapes
 momir/api.py            FastAPI app + routes
 momir/main.py           uvicorn entrypoint
