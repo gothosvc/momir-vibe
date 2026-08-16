@@ -2,6 +2,16 @@
 
 A vibe-coded Magic: The Gathering creature card generator, built for Momir-style play. Give it a mana value, get back a randomly-generated, fully-statted creature card that doesn't exist.
 
+## Screenshots
+
+<p>
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Pulsar Squadron Ace, a 1-mana mythic with Megamorph and two enter-the-battlefield triggers">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Juvenile Mist Dragon, a 5-mana green rare with a discard-matters trigger">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Overbeing of Myth, a 7-mana Prototype vampire with an artifacts-become-creatures trigger">
+</p>
+
+Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
+
 ## Details
 
 ### Card names
