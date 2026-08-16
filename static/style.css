@@ -264,7 +264,12 @@ main {
 .pip-hybrid { background: linear-gradient(90deg, #f8f4e3, #6ea3d8); }
 
 .card-art {
-  height: 150px;
+  /* Scryfall art_crop images aren't a fixed size, so this starts as a
+     reasonable placeholder ratio and gets set precisely in JS once the
+     image loads (see setArtAspectRatio in app.js) -- that way the box
+     always matches the real image instead of cropping it via object-fit. */
+  aspect-ratio: 626 / 457;
+  height: auto;
   border-radius: 6px;
   border: 2px solid rgba(0, 0, 0, 0.4);
   margin-bottom: 0.5rem;
