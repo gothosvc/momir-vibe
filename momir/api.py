@@ -6,7 +6,6 @@ The local API server.
     GET /cards/decode?code=...          -> reconstruct a Card from its share_code
     POST /cards/save                    -> persist a share_code, get a short id back
     GET /c/{id}                         -> the Card saved under that short id
-    GET /momir/match?mana_value=4       -> a Card for each of two players
     GET /health                         -> liveness check
     GET /docs                           -> interactive API docs (Swagger UI)
 
@@ -24,7 +23,7 @@ from . import store
 from .card_builder import MAX_MANA_VALUE, MIN_MANA_VALUE, get_generator
 from .codec import CardCodeError, decode_card
 from .corpus import SUPPORTED_FORMATS, get_corpus
-from .models import Card, MatchPair, SaveCardRequest, SaveCardResponse
+from .models import Card, SaveCardRequest, SaveCardResponse
 
 STATIC_DIR = pathlib.Path(__file__).parent.parent / "static"
 
@@ -106,19 +105,6 @@ def get_saved_card(card_id: str) -> Card:
     if share_code is None:
         raise HTTPException(status_code=404, detail="No saved card with that id.")
     return decode_card(share_code)
-
-
-@app.get("/momir/match", response_model=MatchPair)
-def generate_match(mana_value: int = MANA_VALUE_QUERY, format: Format | None = FORMAT_QUERY) -> MatchPair:
-    """Convenience endpoint: generate one card per player off the same mana value roll."""
-    try:
-        generator = get_generator(format)
-        return MatchPair(
-            player_one=generator.generate(mana_value),
-            player_two=generator.generate(mana_value),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # Mounted last and at "/" so it only ever catches requests the routes above
