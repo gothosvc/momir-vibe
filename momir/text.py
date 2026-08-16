@@ -150,10 +150,19 @@ _DANGLING_OBJECT_VERBS = {"return", "exile", "destroy", "tap", "untap", "sacrifi
 # shows up, the clause has somewhere for its object to land.
 _OBJECT_RESOLVERS = {"to", "from", "under", "instead"}
 # Verbs that only make sense introducing a *new* clause's own subject
-# ("...creature you control GETS +2/+2", "...you control DIES"). Real oracle
-# text pairs these only with a subject that was never anyone else's object,
-# so one showing up while a verb's object is still unresolved is a splice.
-_CLAUSE_SUBJECT_VERBS = {"gets", "get", "gains", "gain", "dies", "die", "attacks", "attack", "enters", "enter", "deals", "deal"}
+# ("...creature you control GETS +2/+2", "...you control DIES", "...you
+# control BECOME 3/3 artifact creatures", "...creatures you control HAVE
+# flying"). Real oracle text pairs these only with a subject that was never
+# anyone else's object, so one showing up while a verb's object is still
+# unresolved is a splice. Sized against the actual frequency of "you control
+# <verb>" in the training corpus, not just the one reported case, since any
+# omitted high-frequency verb reopens the identical splice on a different
+# verb pair.
+_CLAUSE_SUBJECT_VERBS = {
+    "gets", "get", "gains", "gain", "dies", "die", "attacks", "attack",
+    "enters", "enter", "deals", "deal", "becomes", "become", "have", "has",
+    "is", "are", "leaves", "counts", "explores",
+}
 
 
 def _is_complete_sentence(sentence: str, shape: str | None) -> bool:
