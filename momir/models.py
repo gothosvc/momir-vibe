@@ -31,11 +31,6 @@ class Card(BaseModel):
     )
 
 
-class MatchPair(BaseModel):
-    player_one: Card
-    player_two: Card
-
-
 class SaveCardRequest(BaseModel):
     share_code: str = Field(..., description="A card's share_code to persist under a short id.")
 

@@ -55,7 +55,6 @@ frame). Interactive API docs at `/docs`.
 
 - `GET /` — the card mockup web page (`static/`).
 - `GET /cards/generate?mana_value=4` — one generated creature card at that mana value (0-16).
-- `GET /momir/match?mana_value=4` — two cards generated off the same mana value, one per player.
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
 
 Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool. (Legacy/Vintage aren't offered as filters because creatures are almost never banned there, so it'd barely narrow the pool at all -- ~99% of all creatures are legal in both) Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
@@ -96,7 +95,7 @@ momir/colors.py         mana cost synthesis
 momir/stats.py          power/toughness sampling
 momir/types.py          creature type line generation
 momir/card_builder.py   ties it all together into a Card
-momir/models.py         pydantic Card / MatchPair schemas
+momir/models.py         pydantic Card schema + request/response shapes
 momir/api.py            FastAPI app + routes
 momir/main.py           uvicorn entrypoint
 static/                 card mockup web page (vanilla HTML/CSS/JS, no build step)
