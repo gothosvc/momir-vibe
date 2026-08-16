@@ -35,6 +35,22 @@ function renderCard(card) {
   document.getElementById("card-mana").innerHTML = renderManaCost(card.mana_cost);
   document.getElementById("card-type").textContent = card.type_line;
 
+  // art_url is a real creature's art, picked server-side by color-identity
+  // match -- unrelated to this card's name/text, just a plausible-looking
+  // picture (see momir/art.py). Falls back to the plain label when the
+  // corpus has no art data (see momir/models.py's Card.art_url docstring).
+  const artImage = document.getElementById("card-art-image");
+  const artLabel = document.getElementById("card-art-label");
+  if (card.art_url) {
+    artImage.src = card.art_url;
+    artImage.hidden = false;
+    artLabel.hidden = true;
+  } else {
+    artImage.hidden = true;
+    artImage.removeAttribute("src");
+    artLabel.hidden = false;
+  }
+
   const textBox = document.getElementById("card-text");
   textBox.innerHTML = "";
   for (const keyword of card.keywords) {

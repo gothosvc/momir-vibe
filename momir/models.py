@@ -23,6 +23,13 @@ class Card(BaseModel):
     set_code: str = "MMV"
     collector_number: str
     artist: str = "Markov Chain Studios"
+    art_url: str | None = Field(
+        None,
+        description="Art crop from a real creature sharing this card's color "
+        "identity -- unrelated to this card's name/text, picked only for a "
+        "thematically plausible picture. None if the corpus has no art data "
+        "(cache predates this feature) -- see momir/art.py.",
+    )
     share_code: str | None = Field(
         None,
         description="Opaque string encoding this exact card. Feed it back into "

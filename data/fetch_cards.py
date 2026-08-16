@@ -22,7 +22,7 @@ SEARCH_URL = "https://api.scryfall.com/cards/search"
 # Scryfall rejects requests with a generic/default User-Agent (see
 # https://scryfall.com/docs/api). Identify ourselves as their guidelines ask.
 HEADERS = {
-    "User-Agent": "MomirVibeCardGenerator/0.1 (personal hobby project)",
+    "User-Agent": "MomirVibeCardGenerator/0.1 (personal hobby project; https://github.com/gothosvc/momir-vibe)",
     "Accept": "application/json",
 }
 
@@ -31,8 +31,9 @@ HEADERS = {
 QUERY = "type:creature game:paper -is:funny"
 
 # Fields we actually need to train the generator. Scryfall cards carry a lot
-# of printing-specific metadata (set, image URIs, prices, ...) that we don't
-# want to store or train on.
+# of printing-specific metadata (set, most of image_uris, prices, ...) that
+# we don't want to store or train on. "artist" is the one addition kept
+# purely for display, never training -- see below, and momir/art.py.
 KEEP_FIELDS = (
     "name",
     "mana_cost",
@@ -44,6 +45,7 @@ KEEP_FIELDS = (
     "colors",
     "keywords",
     "rarity",
+    "artist",
 )
 
 # Formats corpus.py can filter the training data down to (see its
@@ -90,6 +92,12 @@ def fetch_all(max_cards: int | None = None) -> list[dict]:
             if "power" not in raw or "toughness" not in raw:
                 continue
             trimmed = {k: raw.get(k) for k in KEEP_FIELDS}
+            # The art box alone (no card frame), for momir/art.py to hand
+            # back as a generated card's picture -- see corpus.py's
+            # art_by_colors/all_art. The only other image_uris entries are
+            # full-card renders we have no use for, so this one field is
+            # pulled out individually rather than adding all of image_uris.
+            trimmed["art_crop_url"] = (raw.get("image_uris") or {}).get("art_crop")
             legalities = raw.get("legalities") or {}
             trimmed["legal_formats"] = [fmt for fmt in TRACKED_FORMATS if legalities.get(fmt) == "legal"]
             cards.append(trimmed)
