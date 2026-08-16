@@ -50,7 +50,17 @@ MAX_SENTENCE_WORDS = 32
 # few real creatures) borrow sentences from progressively wider neighboring
 # mana values -- never from the corpus at large -- to stay in the right
 # power-level neighborhood while still having enough to train on.
-MIN_TRAINING_SENTENCES = 60
+#
+# 60 was too low: at order 3 (see TEXT_MARKOV_ORDER), a few hundred sentences
+# still isn't enough distinct overlap for the chain to branch anywhere --
+# most 3-word keys have exactly one real continuation, so generation just
+# plays a source sentence back verbatim, and does so often enough (measured
+# duplicate-line rate across repeated generations at unchanged mana value: cmc
+# 9 83%, cmc 10 85%, cmc 12 87% at the old threshold) that it reads as
+# "samey". Raised so the same borrowing mechanism kicks in earlier: at 1000,
+# every mana value's duplicate rate lands in the same ~3-27% band native bulk
+# mana values (2-6) already sit in, cmc 9-16 included.
+MIN_TRAINING_SENTENCES = 1000
 MAX_BORROW_RADIUS = 32
 
 
