@@ -24,10 +24,12 @@ words (see corpus.py's MIN_KEYWORD_OCCURRENCES) and given a real observed value/
 
 **Mana cost, type line, and power/toughness** are likewise sampled from the actual distribution of real creatures at that mana value, so generated cards feel "on curve" even though nothing about them is real.
 
+**Art** isn't generated at all — that'd be a whole separate project, and this one is about the text. Instead, each card borrows a real creature's art crop, picked by matching color identity (same "sample the real distribution" approach as mana cost/type/stats, just applied to art), so the picture is thematically plausible even though it's for a completely different, unrelated creature. The real artist is credited in the card's meta line rather than the usual joke placeholder. See `momir/art.py`.
+
 
 ## Runs locally
 
-The only network access anywhere in this project is the one-time data fetch from the [Scryfall API](https://scryfall.com/docs/api) — the server/generator itself runs fully offline.
+The one-time data fetch from the [Scryfall API](https://scryfall.com/docs/api) is the only network access this project's *server* ever makes — card generation, training, and the API itself all run fully offline against the cached JSON that fetch produces. The one exception is art: a generated card's `art_url` points at Scryfall's own image CDN, and it's the *browser*, not the server, that loads it when rendering the card — same as any hotlinked image on a web page, not a server-side network dependency.
 
 ## Setup
 
@@ -82,6 +84,8 @@ curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
   "toughness":3,
   "keywords":["Indestructible"],
   "rules_text":["When this creature enters, put a +1/+1 counter on target creature."],
+  "artist":"Some Real Artist",
+  "art_url":"https://cards.scryfall.io/art_crop/front/....jpg",
   ...
   }
 ```
@@ -108,6 +112,7 @@ momir/text.py           rules text + keyword generation
 momir/colors.py         mana cost synthesis
 momir/stats.py          power/toughness sampling
 momir/types.py          creature type line generation
+momir/art.py             real-art selection by color identity
 momir/card_builder.py   ties it all together into a Card
 momir/codec.py           encode/decode a Card to/from its share_code
 momir/store.py           SQLite-backed short-id lookup for shared cards
@@ -122,3 +127,4 @@ static/                 card mockup web page (vanilla HTML/CSS/JS, no build step
 - Generated rules text is flavorful, not mechanically enforced — a generated "Whenever this attacks, draw a card" won't actually do anything in any digital sense. This is a card *generator*, not a game engine.
 - Mana value range is capped at 0-16 (matches the real creature card population closely enough to generate from).
 - Re-running `python -m data.fetch_cards` refreshes the corpus with whatever's newest on Scryfall; delete `data/cards_cache.json` first if you want a completely clean pull.
+- Card art is real, printed Magic art, borrowed for a fake card under a fake, unrelated name -- that mismatch is the joke, not a bug. A `data/cards_cache.json` fetched before this feature existed has no art data at all; generated cards fall back to the plain placeholder box until you re-run `python -m data.fetch_cards`.

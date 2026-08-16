@@ -23,6 +23,11 @@ CACHE_PATH = pathlib.Path(__file__).parent.parent / "data" / "cards_cache.json"
 # an empty corpus.
 SUPPORTED_FORMATS = ("standard", "pioneer", "modern")
 
+# Mirrors colors.py's own _COLOR_ORDER -- kept as a separate copy rather
+# than imported, since colors.py already imports Corpus from here and a
+# reverse import would be circular.
+_COLOR_ORDER = "WUBRG"
+
 _REMINDER_TEXT_RE = re.compile(r"\([^)]*\)")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -196,6 +201,21 @@ class Corpus:
 
     rarities: list[str] = field(default_factory=list)
 
+    # Color identity tuple (WUBRG order, e.g. ("U", "B"); () for colorless)
+    # -> list of (art_crop_url, artist) pairs from real creatures with that
+    # exact color combination -- picking real art for a generated card
+    # stays thematically plausible by matching on color, see momir/art.py.
+    # Empty for a cache fetched before data/fetch_cards.py started keeping
+    # art_crop_url/artist, which momir/art.py treats as "no art available"
+    # rather than an error.
+    art_by_colors: dict[tuple[str, ...], list[tuple[str, str]]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    # Every (art_crop_url, artist) pair seen, regardless of color -- fallback
+    # pool for a color combination with no real creatures of its own (rare,
+    # e.g. 4-5 color identities), see momir/art.py.
+    all_art: list[tuple[str, str]] = field(default_factory=list)
+
     @property
     def available_cmcs(self) -> list[int]:
         return sorted(self.mana_costs_by_cmc.keys())
@@ -335,6 +355,18 @@ def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = Non
                 corpus.character_names.append(primary_name)
             else:
                 corpus.common_names.append(primary_name)
+
+        art_crop_url, artist = card.get("art_crop_url"), card.get("artist")
+        if art_crop_url and artist:
+            # Doesn't depend on cmc, unlike everything below -- indexed
+            # ahead of the `cmc is None` check so a card missing cmc (if
+            # one somehow slipped through fetch_cards.py's filtering) still
+            # contributes its art.
+            raw_colors = card.get("colors") or []
+            color_key = tuple(c for c in _COLOR_ORDER if c in raw_colors)
+            entry = (art_crop_url, artist)
+            corpus.art_by_colors[color_key].append(entry)
+            corpus.all_art.append(entry)
 
         cmc = card.get("cmc")
         if cmc is None:

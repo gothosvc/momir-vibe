@@ -10,7 +10,7 @@ from __future__ import annotations
 import functools
 import random
 
-from . import colors, stats, text, types
+from . import art, colors, stats, text, types
 from .codec import encode_card
 from .corpus import Corpus, get_corpus
 from .markov import WordMarkovChain
@@ -61,6 +61,13 @@ class CardGenerator:
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng)
         rules_text = text.generate_rules_text(self.text_chains[mana_value], name, rng=rng)
 
+        # A real creature's art, matched by color identity -- unrelated to
+        # this card's name/text, just a thematically plausible picture. None
+        # if the corpus has no art data (see momir/art.py), in which case
+        # the artist stays the joke placeholder rather than crediting no one.
+        selected_art = art.select_art(self.corpus, card_colors, rng=rng)
+        art_url, artist = selected_art if selected_art else (None, "Markov Chain Studios")
+
         card = Card(
             name=name,
             mana_cost=mana_cost,
@@ -74,6 +81,8 @@ class CardGenerator:
             rules_text=rules_text,
             rarity=self._rarity(rng),
             collector_number=self._collector_number(),
+            artist=artist,
+            art_url=art_url,
         )
         # Attach a share code so every generated card is reconstructible from
         # this response alone -- see momir/codec.py.
