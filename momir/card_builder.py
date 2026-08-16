@@ -11,6 +11,7 @@ import functools
 import random
 
 from . import colors, stats, text, types
+from .codec import encode_card
 from .corpus import Corpus, get_corpus
 from .markov import WordMarkovChain
 from .models import Card
@@ -60,7 +61,7 @@ class CardGenerator:
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng)
         rules_text = text.generate_rules_text(self.text_chains[mana_value], name, rng=rng)
 
-        return Card(
+        card = Card(
             name=name,
             mana_cost=mana_cost,
             mana_value=mana_value,
@@ -74,6 +75,10 @@ class CardGenerator:
             rarity=self._rarity(rng),
             collector_number=self._collector_number(),
         )
+        # Attach a share code so every generated card is reconstructible from
+        # this response alone -- see momir/codec.py.
+        card.share_code = encode_card(card)
+        return card
 
 
 @functools.lru_cache(maxsize=None)

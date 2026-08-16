@@ -3,6 +3,9 @@ The local API server.
 
     GET /                               -> the card-mockup web page (static/)
     GET /cards/generate?mana_value=4    -> a single generated Card
+    GET /cards/decode?code=...          -> reconstruct a Card from its share_code
+    POST /cards/save                    -> persist a share_code, get a short id back
+    GET /c/{id}                         -> the Card saved under that short id
     GET /momir/match?mana_value=4       -> a Card for each of two players
     GET /health                         -> liveness check
     GET /docs                           -> interactive API docs (Swagger UI)
@@ -17,9 +20,11 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
+from . import store
 from .card_builder import MAX_MANA_VALUE, MIN_MANA_VALUE, get_generator
+from .codec import CardCodeError, decode_card
 from .corpus import SUPPORTED_FORMATS, get_corpus
-from .models import Card, MatchPair
+from .models import Card, MatchPair, SaveCardRequest, SaveCardResponse
 
 STATIC_DIR = pathlib.Path(__file__).parent.parent / "static"
 
@@ -34,6 +39,7 @@ app = FastAPI(
 # generators are built lazily on first use and cached from then on -- see
 # card_builder.get_generator.
 get_generator()
+store.init_db()
 
 Format = Literal["standard", "pioneer", "modern"]
 
@@ -65,6 +71,41 @@ def generate_card(mana_value: int = MANA_VALUE_QUERY, format: Format | None = FO
         return get_generator(format).generate(mana_value)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/cards/decode", response_model=Card)
+def decode_card_endpoint(
+    code: str = Query(..., description="A card's share_code, from a previously generated Card."),
+) -> Card:
+    """Reconstruct a previously generated card from its share_code. Pure
+    decode -- no regeneration, no corpus/RNG involved -- so it always
+    reproduces exactly the card the code came from, see momir/codec.py."""
+    try:
+        return decode_card(code)
+    except CardCodeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/cards/save", response_model=SaveCardResponse)
+def save_card(request: SaveCardRequest) -> SaveCardResponse:
+    """Persist a card's share_code and hand back a short id for it, so a
+    shareable link can be `/c/<id>` instead of the full share_code. Purely
+    additive over /cards/decode -- the id is just a lookup for the same
+    share_code, see momir/store.py."""
+    try:
+        card = decode_card(request.share_code)
+    except CardCodeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return SaveCardResponse(id=store.save_card(card))
+
+
+@app.get("/c/{card_id}", response_model=Card)
+def get_saved_card(card_id: str) -> Card:
+    """Look up a card previously persisted via POST /cards/save."""
+    share_code = store.get_share_code(card_id)
+    if share_code is None:
+        raise HTTPException(status_code=404, detail="No saved card with that id.")
+    return decode_card(share_code)
 
 
 @app.get("/momir/match", response_model=MatchPair)

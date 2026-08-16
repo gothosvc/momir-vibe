@@ -109,6 +109,99 @@ main {
   text-align: center;
 }
 
+.status {
+  color: #a9e0a0;
+  background: #1f3a22;
+  border: 1px solid #2f6b38;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  max-width: 340px;
+  text-align: center;
+}
+
+/* --- Save / share --- */
+
+.card-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.card-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #454550;
+  background: #26262c;
+  color: var(--page-fg);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.card-actions button:hover {
+  filter: brightness(1.15);
+}
+
+.card-actions button.saved {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.saved-section {
+  width: 100%;
+  max-width: 340px;
+  margin-top: 2rem;
+}
+
+.saved-section h2 {
+  font-size: 1rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.saved-list li {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.saved-item {
+  flex: 1;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #454550;
+  background: #26262c;
+  color: var(--page-fg);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.saved-item:hover {
+  filter: brightness(1.15);
+}
+
+.saved-item-remove {
+  padding: 0 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #454550;
+  background: #26262c;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.saved-item-remove:hover {
+  color: #ff8a80;
+}
+
 /* --- Card frame --- */
 
 .card {
