@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import random
 
-from .corpus import Corpus
+from .corpus import Corpus, has_ungrounded_x
 from .markov import WordMarkovChain
 
 KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasionally more
@@ -196,6 +196,20 @@ def _is_complete_sentence(sentence: str, shape: str | None) -> bool:
     memory that "return" back at the start of the clause is still waiting on
     an object once it's a few words further along. See momir/markov.py.
 
+    Also catches a bare, unresolvable "X": training already excludes real
+    sentences where X's value isn't defined within that same sentence (see
+    corpus.py's has_ungrounded_x) -- e.g. "This creature enters with X
+    +1/+1 counters on it." never made it in, since nothing about a
+    generated card can supply what X is. But the chain can still *produce*
+    that same failure fresh, by opening on a real X sentence's start and
+    then, before ever reaching its grounding "where X is ..." clause,
+    wandering off into a same-shape continuation that doesn't have one --
+    the same kind of mid-generation splice as the dangling-object case
+    above, just with a defining clause going missing instead of a whole
+    object. Run through the identical check used at training time so a
+    freshly-spliced ungrounded X is caught the same way a pre-existing one
+    would have been.
+
     Also enforces the structural punctuation each shape is defined by (see
     corpus.py's _sentence_shape): every real trigger sentence is a condition
     clause, a comma, then an effect ("Whenever X, Y."), and every real
@@ -219,6 +233,8 @@ def _is_complete_sentence(sentence: str, shape: str | None) -> bool:
     if shape == "trigger" and "," not in sentence:
         return False
     if shape == "activated" and ":" not in sentence:
+        return False
+    if has_ungrounded_x(sentence, shape or ""):
         return False
     dangling = False
     for word in sentence.split():
