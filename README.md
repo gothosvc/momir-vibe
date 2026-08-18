@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Pulsar Squadron Ace, a 1-mana mythic with Megamorph and two enter-the-battlefield triggers">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Juvenile Mist Dragon, a 5-mana green rare with a discard-matters trigger">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Overbeing of Myth, a 7-mana Prototype vampire with an artifacts-become-creatures trigger">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Riders of the Guildpact, a 2-mana white rare with Menace, Flying, and an activated pump ability">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Pakandybuck, a 5-mana black mythic Drake with Flying, Prototype, and an attack trigger that doubles power">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Dire Fleet Interloper, an 8-mana green mythic Dinosaur with two enter-the-battlefield triggers">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.

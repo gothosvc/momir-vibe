@@ -281,6 +281,43 @@ def _normalize_self_references(text: str, name: str) -> str:
     return text
 
 
+# A bare "X" pronoun -- its value set elsewhere on the card, by an {X}
+# spell cost, a "choose a number" cost, or a sibling sentence like "This
+# creature enters with X +1/+1 counters on it" -- reads as nonsense once
+# picked as an isolated training sentence divorced from whatever set it up:
+# no generated card ever prints an {X} cost (see colors.py's
+# synthesize_mana_cost) or carries a sibling sentence along with it, so
+# "reveal the top X cards of your library" ends up with no X to resolve at
+# all. Real oracle text does have sentences that ground X entirely within
+# themselves, though, and those are fine to keep: a "where X is ..." clause
+# spells it out explicitly, and an activated ability whose own cost names X
+# ("Sacrifice X lands: Put X +1/+1 counters on this creature.") defines it
+# by the act of paying that cost. Everything else referencing a bare X is
+# presumed to lean on context this generator can never supply.
+_BARE_X_RE = re.compile(r"\bX\b")
+_WHERE_X_RE = re.compile(r"\bwhere X (is|was)\b", re.IGNORECASE)
+
+
+def has_ungrounded_x(sentence: str, shape: str) -> bool:
+    """True if `sentence` uses a bare X that isn't defined anywhere within
+    itself -- see the comment above for why that's unresolvable here. Public
+    (not `_`-prefixed) because momir/text.py runs this same check against
+    Markov-generated candidate sentences, not just real training ones: the
+    chain can still *splice* a grounded training sentence's opening onto an
+    unrelated continuation that drops its "where X is" tail before ever
+    generating it, producing a freshly-ungrounded sentence that was never
+    literally seen in training. See text.py's _is_complete_sentence."""
+    if not _BARE_X_RE.search(sentence):
+        return False
+    if "{X}" in sentence or _WHERE_X_RE.search(sentence):
+        return False
+    if shape == "activated" and ":" in sentence:
+        cost, _, effect = sentence.partition(":")
+        if _BARE_X_RE.search(cost) and _BARE_X_RE.search(effect):
+            return False
+    return True
+
+
 def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[str, int, str]]:
     """Returns (sentence, position, shape) triples; see _sentence_shape.
 
@@ -317,9 +354,11 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
             # land in different sentences (or get sentence-split apart
             # entirely) -- word-splicing has no way to keep them balanced,
             # so quoted sentences are dropped rather than left to produce
-            # stray dangling quote marks.
-            if '"' not in sentence:
-                sentences.append((sentence, position, _sentence_shape(sentence)))
+            # stray dangling quote marks. Sentences with an ungrounded bare
+            # "X" are dropped for the same reason -- see has_ungrounded_x.
+            shape = _sentence_shape(sentence)
+            if '"' not in sentence and not has_ungrounded_x(sentence, shape):
+                sentences.append((sentence, position, shape))
             position += 1
     return sentences
 
