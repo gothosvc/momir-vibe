@@ -12,34 +12,37 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
 
-## Details
+## How it works
 
 ### Card names
 
-Card **names** are generated one of two ways: 
+Names are generated one of two ways, depending on whether the card is legendary:
 
-1. matching how real creatures are named: ordinary creatures get species/role names ("Grizzly Bears", "Goblin Piker") assembled from real name words by a word-level Markov chain, so the result is always real English words in a new combination, never invented syllables; and
-2. legendary creatures get personal character names ("Jace", "Chandra, Fire Artisan") from a character-level Markov chain, which *is* free to invent new syllables since that's how invented character names are supposed to sound. 
+- **Ordinary creatures** get species/role names ("Grizzly Bears", "Goblin Piker") assembled by a **word-level** Markov chain. It only recombines real English words, so the result is never invented syllables.
+- **Legendary creatures** get personal character names ("Jace", "Chandra, Fire Artisan") from a **character-level** Markov chain, which is free to invent new syllables — that's how invented character names are supposed to sound.
 
-How often a generated card gets a character name mirrors how often real creatures are legendary.
+How often a generated card comes back legendary mirrors how often real creatures are legendary.
 
 ### Rules text
 
-**Rules text** is a mix of real keyword abilities (sampled by how often they appear at that mana value, restricted to keywords we found real printed text for and pruned of one-off card-specific ability
-words (see corpus.py's MIN_KEYWORD_OCCURRENCES) and given a real observed value/cost when the keyword takes one, e.g. "Ward" -> "Ward {2}", so a keyword never shows up incomplete). Text is trained *only* on oracle text from real creatures at that same mana value (widening to nearby mana values only if there isn't enough data), so a 1-drop's generated text is never built from words that only ever show up on eight-mana bombs. 
+Rules text is a mix of:
 
-**Sentences** are also kept separate by construct ("shape" -- triggered/activated/static ability) during training and generation, so a generated line can't wander mid-sentence from one construct into another. Line-level templating that only makes sense inside its own card frame (Saga chapters, Class level headers, Case/d20-roll threshold rows, Choose-one's bullet options) is filtered out of training entirely rather than left for the chain to mangle. 
+- **Keyword abilities**, sampled by how often they appear at that mana value. Keywords are restricted to ones we have real printed text for, pruned of one-off card-specific ability words (see `MIN_KEYWORD_OCCURRENCES` in `momir/corpus.py`), and given a real observed value/cost when the keyword takes one (e.g. "Ward" → "Ward {2}") so a keyword never shows up incomplete.
+- **Generated sentences**, trained only on oracle text from real creatures at that same mana value (widening to nearby mana values only if there isn't enough data). A 1-drop's generated text is never built from words that only ever show up on eight-mana bombs.
 
-### Other features
+Sentences are also kept separate by construct — triggered / activated / static ability — during both training and generation, so a generated line can't wander mid-sentence from one construct into another. Line-level templating that only makes sense inside its own card frame (Saga chapters, Class level headers, Case/d20-roll threshold rows, Choose-one's bullet options) is filtered out of training entirely, rather than left for the chain to mangle.
+
+### Everything else
 
 **Mana cost, type line, and power/toughness** are likewise sampled from the actual distribution of real creatures at that mana value, so generated cards feel "on curve" even though nothing about them is real.
 
-**Art** isn't generated at all — that'd be a whole separate project, and this one is about the text. Instead, each card borrows a real creature's art crop, picked by matching color identity (same "sample the real distribution" approach as mana cost/type/stats, just applied to art), so the picture is thematically plausible even though it's for a completely different, unrelated creature. The real artist is credited in the card's meta line rather than the usual joke placeholder. See `momir/art.py`.
-
+**Art** isn't generated at all — that'd be a whole separate project, and this one is about the text. Instead, each card borrows a real creature's art crop, picked by matching color identity (the same "sample the real distribution" approach used for mana cost/type/stats, just applied to art), so the picture is thematically plausible even though it's for a completely different, unrelated creature. The real artist is credited in the card's meta line rather than the usual joke placeholder. See `momir/art.py`.
 
 ## Runs locally
 
-The one-time data fetch from the [Scryfall API](https://scryfall.com/docs/api) is the only network access this project's *server* ever makes — card generation, training, and the API itself all run fully offline against the cached JSON that fetch produces. The one exception is art: a generated card's `art_url` points at Scryfall's own image CDN, and it's the *browser*, not the server, that loads it when rendering the card — same as any hotlinked image on a web page, not a server-side network dependency.
+The one-time data fetch from the [Scryfall API](https://scryfall.com/docs/api) is the only network access this project's *server* ever makes. Card generation, training, and the API itself all run fully offline against the cached JSON that fetch produces.
+
+The one exception is art: a generated card's `art_url` points at Scryfall's own image CDN, and it's the *browser*, not the server, that loads it when rendering the card — same as any hotlinked image on a web page, not a server-side network dependency.
 
 ## Setup
 
@@ -59,22 +62,22 @@ python -m data.fetch_cards
 python -m momir.main
 ```
 
-Serves at `http://127.0.0.1:8000` — open it in a browser for a small card
-mockup page (mana value input + Generate button, rendered into a CSS card
-frame). Interactive API docs at `/docs`.
+Serves at `http://127.0.0.1:8000` — open it in a browser for a small card mockup page (mana value input + Generate button, rendered into a CSS card frame). Interactive API docs at `/docs`.
 
 ### Endpoints
 
 - `GET /` — the card mockup web page (`static/`).
-- `GET /cards/generate?mana_value=4` — one generated creature card at that mana value (0-16).
+- `GET /cards/generate?mana_value=4` — one generated creature card at that mana value (0–16).
 - `GET /cards/decode?code=...` — reconstruct a card from its `share_code` (see "Saving and sharing cards" below).
 - `POST /cards/save` — body `{"share_code": "..."}`; persists it server-side and returns `{"id": "..."}`.
 - `GET /c/{id}` — the card saved under that short id.
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
 
-Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool. (Legacy/Vintage aren't offered as filters because creatures are almost never banned there, so it'd barely narrow the pool at all -- ~99% of all creatures are legal in both) Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
+Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool.
 
-Note that a Standard-scoped corpus is only as fresh as the last `data/fetch_cards.py` run -- Standard rotates sets out over time, and this project never re-fetches on its own, so re-run the fetch occasionally if you're using `format=standard`. Modern/Pioneer don't have this problem asbans are rare and don't expire.
+Legacy/Vintage aren't offered as filters — creatures are almost never banned there (~99% of all creatures are legal in both), so it'd barely narrow the pool at all. Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
+
+> **Note:** a Standard-scoped corpus is only as fresh as the last `data/fetch_cards.py` run. Standard rotates sets out over time, and this project never re-fetches on its own, so re-run the fetch occasionally if you're using `format=standard`. Modern/Pioneer don't have this problem, since bans are rare and don't expire.
 
 Example:
 
@@ -84,20 +87,20 @@ curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
 
 ```json
 {
-  "name":"Treetop Freedom Fighters",
-  "mana_cost":"{3}",
-  "mana_value":3,
-  "colors":[],
-  "color_identity":[],
-  "type_line":"Creature — Human Druid",
-  "power":2,
-  "toughness":3,
-  "keywords":["Indestructible"],
-  "rules_text":["When this creature enters, put a +1/+1 counter on target creature."],
-  "artist":"Some Real Artist",
-  "art_url":"https://cards.scryfall.io/art_crop/front/....jpg",
+  "name": "Treetop Freedom Fighters",
+  "mana_cost": "{3}",
+  "mana_value": 3,
+  "colors": [],
+  "color_identity": [],
+  "type_line": "Creature — Human Druid",
+  "power": 2,
+  "toughness": 3,
+  "keywords": ["Indestructible"],
+  "rules_text": ["When this creature enters, put a +1/+1 counter on target creature."],
+  "artist": "Some Real Artist",
+  "art_url": "https://cards.scryfall.io/art_crop/front/....jpg",
   ...
-  }
+}
 ```
 
 ### Saving and sharing cards
@@ -114,18 +117,18 @@ The SQLite DB is a lookup cache, not a source of truth — every row is just `id
 ## Project layout
 
 ```
-data/fetch_cards.py   one-time Scryfall fetch -> data/cards_cache.json
-momir/corpus.py        loads the cache, builds training indices
-momir/markov.py        the generic Markov chain implementations
-momir/names.py         name generation (common: word-level Markov, character: char-level Markov)
+data/fetch_cards.py    one-time Scryfall fetch -> data/cards_cache.json
+momir/corpus.py         loads the cache, builds training indices
+momir/markov.py         the generic Markov chain implementations
+momir/names.py          name generation (common: word-level Markov, character: char-level Markov)
 momir/text.py           rules text + keyword generation
 momir/colors.py         mana cost synthesis
 momir/stats.py          power/toughness sampling
 momir/types.py          creature type line generation
-momir/art.py             real-art selection by color identity
+momir/art.py            real-art selection by color identity
 momir/card_builder.py   ties it all together into a Card
-momir/codec.py           encode/decode a Card to/from its share_code
-momir/store.py           SQLite-backed short-id lookup for shared cards
+momir/codec.py          encode/decode a Card to/from its share_code
+momir/store.py          SQLite-backed short-id lookup for shared cards
 momir/models.py         pydantic Card schema + request/response shapes
 momir/api.py            FastAPI app + routes
 momir/main.py           uvicorn entrypoint
@@ -135,6 +138,6 @@ static/                 card mockup web page (vanilla HTML/CSS/JS, no build step
 ## Notes / limitations
 
 - Generated rules text is flavorful, not mechanically enforced — a generated "Whenever this attacks, draw a card" won't actually do anything in any digital sense. This is a card *generator*, not a game engine.
-- Mana value range is capped at 0-16 (matches the real creature card population closely enough to generate from).
+- Mana value range is capped at 0–16 (matches the real creature card population closely enough to generate from).
 - Re-running `python -m data.fetch_cards` refreshes the corpus with whatever's newest on Scryfall; delete `data/cards_cache.json` first if you want a completely clean pull.
-- Card art is real, printed Magic art, borrowed for a fake card under a fake, unrelated name -- that mismatch is the joke, not a bug. A `data/cards_cache.json` fetched before this feature existed has no art data at all; generated cards fall back to the plain placeholder box until you re-run `python -m data.fetch_cards`.
+- Card art is real, printed Magic art, borrowed for a fake card under a fake, unrelated name — that mismatch is the joke, not a bug. A `data/cards_cache.json` fetched before this feature existed has no art data at all; generated cards fall back to the plain placeholder box until you re-run `python -m data.fetch_cards`.
