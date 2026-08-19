@@ -93,27 +93,29 @@ MIN_KEYWORD_OCCURRENCES = 3
 def _keyword_occurrence(oracle_text: str, keyword: str, name: str = "") -> str | None:
     """The value/cost suffix actually printed after `keyword` on this card
     ("" if it's bare), or None if `keyword` never literally appears in the
-    text at all. The None case matters: Scryfall's keywords list includes
-    umbrella family tags ("Landwalk", "Typecycling") alongside the specific
-    variant actually printed ("Swampwalk", "Forestcycling") -- the umbrella
-    tag itself is never real card text, so it shouldn't be offered up as a
-    standalone generated keyword either.
+    text at all.
+
+    The None case matters: Scryfall's keywords list includes umbrella family
+    tags ("Landwalk", "Typecycling") alongside the specific variant actually
+    printed ("Swampwalk", "Forestcycling") -- the umbrella tag itself is
+    never real card text, so it shouldn't be offered up as a standalone
+    generated keyword either.
 
     Some keyword values reference their own card by name (a Heroic trigger's
     "Whenever you cast a spell that targets <Name>") -- normalized to "~"
     same as sentence training, so it doesn't leak into a differently-named
     generated card. See _normalize_self_references.
 
-    Only the trailing side is stripped: real templating actually uses two
-    different conventions after a keyword name -- an alt-cost dash fuses
-    directly ("Ward—Pay 2 life"), an ability word gets a space on both sides
+    Only the trailing side is stripped: real templating uses two different
+    conventions after a keyword name -- an alt-cost dash fuses directly
+    ("Ward—Pay 2 life"), an ability word gets a space on both sides
     ("Landfall — Whenever ..."). Keeping the leading whitespace (or lack of
     it) verbatim reproduces whichever one the source card actually used,
     rather than guessing.
 
-    Searched line by line (skipping template-fragment and quoted lines, same
-    screening _extract_sentences applies to sentence training -- see
-    _is_template_fragment) rather than across the whole text at once, so a
+    Searched line by line -- skipping template-fragment and quoted lines,
+    the same screening _extract_sentences applies to sentence training, see
+    _is_template_fragment -- rather than across the whole text at once, so a
     keyword that happens to also appear inside e.g. a Choose-one bullet or a
     granted-ability's quoted sub-text on this card doesn't have that
     fragment's mismatched context captured as its value."""
@@ -160,14 +162,16 @@ class Corpus:
     # cmc -> list of (sentence, position, shape) triples from creatures at
     # that cmc, where position is the sentence's index (0 = opener) within
     # its source card's oracle text, capped at MAX_SENTENCE_POSITION, and
-    # shape is its construct type (see _sentence_shape). Kept per-cmc
-    # (rather than one flat pool) so a 1-drop's generated text is trained
-    # only on what 1-drops actually say -- not phrases pulled in from
-    # eight-mana bombs -- kept per-position so generated text opens with
-    # real openers rather than orphaned continuation clauses, and kept
-    # per-shape so a generated triggered ability doesn't splice mid-sentence
-    # into an unrelated activated ability's cost:effect clause -- see
-    # momir/markov.py's WordMarkovChain and momir/text.py.
+    # shape is its construct type (see _sentence_shape). Three separate axes
+    # of bucketing, each guarding against a different failure mode:
+    #   - per-cmc, so a 1-drop's generated text is trained only on what
+    #     1-drops actually say, not phrases pulled in from eight-mana bombs;
+    #   - per-position, so generated text opens with real openers rather
+    #     than orphaned continuation clauses;
+    #   - per-shape, so a generated triggered ability doesn't splice
+    #     mid-sentence into an unrelated activated ability's cost:effect
+    #     clause.
+    # See momir/markov.py's WordMarkovChain and momir/text.py.
     sentences_by_cmc: dict[int, list[tuple[str, int, str]]] = field(default_factory=lambda: defaultdict(list))
 
     # cmc -> list of raw mana_cost strings actually used at that cmc
@@ -281,14 +285,15 @@ def _normalize_self_references(text: str, name: str) -> str:
     return text
 
 
-# A bare "X" pronoun -- its value set elsewhere on the card, by an {X}
-# spell cost, a "choose a number" cost, or a sibling sentence like "This
-# creature enters with X +1/+1 counters on it" -- reads as nonsense once
-# picked as an isolated training sentence divorced from whatever set it up:
-# no generated card ever prints an {X} cost (see colors.py's
-# synthesize_mana_cost) or carries a sibling sentence along with it, so
-# "reveal the top X cards of your library" ends up with no X to resolve at
-# all. Real oracle text does have sentences that ground X entirely within
+# A bare "X" pronoun -- its value set elsewhere on the card, by an {X} spell
+# cost, a "choose a number" cost, or a sibling sentence like "This creature
+# enters with X +1/+1 counters on it" -- reads as nonsense once picked as an
+# isolated training sentence divorced from whatever set it up: no generated
+# card ever prints an {X} cost (see colors.py's synthesize_mana_cost) or
+# carries a sibling sentence along with it, so "reveal the top X cards of
+# your library" ends up with no X to resolve at all.
+#
+# Real oracle text does have sentences that ground X entirely within
 # themselves, though, and those are fine to keep: a "where X is ..." clause
 # spells it out explicitly, and an activated ability whose own cost names X
 # ("Sacrifice X lands: Put X +1/+1 counters on this creature.") defines it

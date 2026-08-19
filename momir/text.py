@@ -51,15 +51,15 @@ MAX_SENTENCE_WORDS = 32
 # mana values -- never from the corpus at large -- to stay in the right
 # power-level neighborhood while still having enough to train on.
 #
-# 60 was too low: at order 3 (see TEXT_MARKOV_ORDER), a few hundred sentences
-# still isn't enough distinct overlap for the chain to branch anywhere --
-# most 3-word keys have exactly one real continuation, so generation just
-# plays a source sentence back verbatim, and does so often enough (measured
-# duplicate-line rate across repeated generations at unchanged mana value: cmc
-# 9 83%, cmc 10 85%, cmc 12 87% at the old threshold) that it reads as
-# "samey". Raised so the same borrowing mechanism kicks in earlier: at 1000,
-# every mana value's duplicate rate lands in the same ~3-27% band native bulk
-# mana values (2-6) already sit in, cmc 9-16 included.
+# 60 was too low. At order 3 (see TEXT_MARKOV_ORDER), a few hundred
+# sentences still isn't enough distinct overlap for the chain to branch
+# anywhere -- most 3-word keys have exactly one real continuation, so
+# generation just plays a source sentence back verbatim. Measured duplicate-
+# line rate across repeated generations at unchanged mana value, at the old
+# threshold: cmc 9 83%, cmc 10 85%, cmc 12 87% -- often enough to read as
+# "samey". Raised to 1000 so the same borrowing mechanism kicks in earlier:
+# every mana value's duplicate rate now lands in the same ~3-27% band native
+# bulk mana values (2-6) already sit in, cmc 9-16 included.
 MIN_TRAINING_SENTENCES = 1000
 MAX_BORROW_RADIUS = 32
 
@@ -174,56 +174,58 @@ _CLAUSE_SUBJECT_VERBS = {
 
 def _is_complete_sentence(sentence: str, shape: str | None) -> bool:
     """Backstop against generations that never actually reached a genuine
-    sentence end. Every trained sentence carries its own real terminal
-    punctuation (that's how corpus.py split sentences out of oracle text in
-    the first place) -- so a chain that reaches a real ending should too.
-    One that doesn't is a giveaway it got cut off mid-clause by the word cap
-    instead, which otherwise reads as a dangling fragment with a period
-    stapled onto whatever word it happened to stop on (".../, and.",
-    "...play that."). Also catches the same double-colon/bullet/pipe tells
-    as before -- most commonly two same-shape activated-ability clauses
-    fusing into a double "cost: effect: effect".
+    sentence end. Catches four distinct ways a chain can go wrong:
 
-    Also catches a subtler splice that still ends cleanly: a sentence that
-    opens a directive verb's object ("return a black creature you control")
-    but, before that object ever resolves (a preposition, a comma, a new
-    clause), gets hijacked mid-object by an unrelated clause's verb ("...gets
-    +2/+0 until end of turn"). This happens because two real sentences --
-    "Return another creature you control to its owner's hand." and "Another
-    creature you control gets +2/+2 until end of turn." -- share the long
-    common run "creature you control", which is enough real match at any
-    Markov order to walk from one straight into the other: the chain has no
-    memory that "return" back at the start of the clause is still waiting on
-    an object once it's a few words further along. See momir/markov.py.
+    1. **Cut off by the word cap.** Every trained sentence carries its own
+       real terminal punctuation (that's how corpus.py split sentences out
+       of oracle text in the first place), so a chain that reaches a real
+       ending should too. One that doesn't got cut off mid-clause instead,
+       which otherwise reads as a dangling fragment with a period stapled
+       onto whatever word it happened to stop on (".../, and.", "...play
+       that."). Also catches the same double-colon/bullet/pipe tells as
+       before -- most commonly two same-shape activated-ability clauses
+       fusing into a double "cost: effect: effect".
 
-    Also catches a bare, unresolvable "X": training already excludes real
-    sentences where X's value isn't defined within that same sentence (see
-    corpus.py's has_ungrounded_x) -- e.g. "This creature enters with X
-    +1/+1 counters on it." never made it in, since nothing about a
-    generated card can supply what X is. But the chain can still *produce*
-    that same failure fresh, by opening on a real X sentence's start and
-    then, before ever reaching its grounding "where X is ..." clause,
-    wandering off into a same-shape continuation that doesn't have one --
-    the same kind of mid-generation splice as the dangling-object case
-    above, just with a defining clause going missing instead of a whole
-    object. Run through the identical check used at training time so a
-    freshly-spliced ungrounded X is caught the same way a pre-existing one
-    would have been.
+    2. **A dangling-object splice that still ends cleanly.** A sentence
+       opens a directive verb's object ("return a black creature you
+       control") but, before that object ever resolves (a preposition, a
+       comma, a new clause), gets hijacked mid-object by an unrelated
+       clause's verb ("...gets +2/+0 until end of turn"). This happens
+       because two real sentences -- "Return another creature you control
+       to its owner's hand." and "Another creature you control gets +2/+2
+       until end of turn." -- share the long common run "creature you
+       control", which is enough real match at any Markov order to walk
+       from one straight into the other: the chain has no memory that
+       "return" back at the start of the clause is still waiting on an
+       object once it's a few words further along. See momir/markov.py.
 
-    Also enforces the structural punctuation each shape is defined by (see
-    corpus.py's _sentence_shape): every real trigger sentence is a condition
-    clause, a comma, then an effect ("Whenever X, Y."), and every real
-    activated-ability sentence is a cost, a colon, then an effect ("Cost:
-    Y."). A chain that walks straight from the condition/cost into a
-    same-tail effect clause without ever emitting that separator -- for the
-    same reason as the splice above -- produces a sentence that's actually
-    just the condition or cost alone with an effect's tail bolted on, e.g.
-    "Whenever an equipped creature you control gets +3/+0 until end of
-    turn." (missing the actual triggering event and its comma) or "{2},
-    Exile a creature card from your graveyard to the battlefield." (missing
-    the colon and the ability that cost was for). Checked directly against
-    `shape` rather than re-deriving it from the text, since the caller
-    already knows which one was requested."""
+    3. **A freshly-spliced, unresolvable "X".** Training already excludes
+       real sentences where X's value isn't defined within that same
+       sentence (see corpus.py's has_ungrounded_x) -- e.g. "This creature
+       enters with X +1/+1 counters on it." never made it in, since nothing
+       about a generated card can supply what X is. But the chain can still
+       *produce* that same failure fresh: it opens on a real X sentence's
+       start, then, before ever reaching its grounding "where X is ..."
+       clause, wanders off into a same-shape continuation that doesn't have
+       one. Same splice mechanism as case 2, just with a defining clause
+       going missing instead of a whole object. Run through the identical
+       check used at training time so a freshly-spliced ungrounded X is
+       caught the same way a pre-existing one would have been.
+
+    4. **Missing structural punctuation.** Every real trigger sentence is a
+       condition clause, a comma, then an effect ("Whenever X, Y."), and
+       every real activated-ability sentence is a cost, a colon, then an
+       effect ("Cost: Y." -- see corpus.py's _sentence_shape). A chain that
+       walks straight from the condition/cost into a same-tail effect
+       clause without ever emitting that separator -- the same splice
+       mechanism again -- produces a sentence that's actually just the
+       condition or cost alone with an effect's tail bolted on, e.g.
+       "Whenever an equipped creature you control gets +3/+0 until end of
+       turn." (missing the triggering event and its comma) or "{2}, Exile a
+       creature card from your graveyard to the battlefield." (missing the
+       colon and the ability that cost was for). Checked directly against
+       `shape` rather than re-deriving it from the text, since the caller
+       already knows which one was requested."""
     if not sentence.endswith((".", "!", "?")):
         return False
     if sentence.count(":") >= 2:

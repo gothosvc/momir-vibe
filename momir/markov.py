@@ -12,13 +12,15 @@ Two flavors are used elsewhere in the generator:
   sentences carry a "position" (their index within the source card's oracle
   text) and a "shape" (its construct type -- trigger/activated/static; see
   momir/corpus.py's _sentence_shape). Generation can request either:
-  position is what keeps generated opening lines sounding like real openers
-  instead of orphaned continuation clauses like "If a spell is countered
-  this way, ..." that only make sense following the sentence that set them
-  up; shape is what stops a generated sentence from wandering mid-generation
-  from e.g. a triggered ability into an unrelated activated ability's
-  "cost:" clause -- transitions are modeled separately per shape, so a
-  chain that starts as one construct only ever continues as that construct.
+
+  - Position keeps generated opening lines sounding like real openers,
+    instead of orphaned continuation clauses like "If a spell is countered
+    this way, ..." that only make sense following the sentence that set
+    them up.
+  - Shape stops a generated sentence from wandering mid-generation from
+    e.g. a triggered ability into an unrelated activated ability's "cost:"
+    clause. Transitions are modeled separately per shape, so a chain that
+    starts as one construct only ever continues as that construct.
 """
 from __future__ import annotations
 
