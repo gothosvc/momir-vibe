@@ -51,6 +51,23 @@ def _nearest_available_cmc(corpus: Corpus, mana_value: int) -> int | None:
     return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
 
 
+def _adapt_to_mana_value(template: str, mana_value: int) -> str:
+    """Rebuild a real cost's colored-pip pattern so its total mana value
+    matches mana_value -- for borrowing a template from a different cmc,
+    whether because the exact one was sparse or, under mayhem, because the
+    template was drawn from an unrelated cmc on purpose."""
+    symbols = [s for s in parse_symbols(template) if not _is_generic(s)]
+
+    # Each non-generic symbol (colored pip, hybrid, Phyrexian, ...)
+    # contributes 1 to mana value in the overwhelming common case.
+    while symbols and len(symbols) > mana_value:
+        symbols.pop()
+
+    remaining = mana_value - len(symbols)
+    out = ([str(remaining)] if remaining > 0 else []) + symbols
+    return build_cost_string(out) or f"{{{mana_value}}}"
+
+
 def synthesize_mana_cost(
     corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False
 ) -> str:
@@ -66,7 +83,9 @@ def synthesize_mana_cost(
             weight = mana_value_weight(cmc, mana_value)
             items.extend(pool)
             weights.extend([weight] * len(pool))
-        return rng.choices(items, weights=weights)[0] if items else build_cost_string([str(mana_value)])
+        if not items:
+            return build_cost_string([str(mana_value)])
+        return _adapt_to_mana_value(rng.choices(items, weights=weights)[0], mana_value)
 
     exact_matches = corpus.mana_costs_by_cmc.get(mana_value)
     if exact_matches:
@@ -79,14 +98,4 @@ def synthesize_mana_cost(
     if nearest is None:
         return build_cost_string([str(mana_value)])
 
-    template = rng.choice(corpus.mana_costs_by_cmc[nearest])
-    symbols = [s for s in parse_symbols(template) if not _is_generic(s)]
-
-    # Each non-generic symbol (colored pip, hybrid, Phyrexian, ...)
-    # contributes 1 to mana value in the overwhelming common case.
-    while symbols and len(symbols) > mana_value:
-        symbols.pop()
-
-    remaining = mana_value - len(symbols)
-    out = ([str(remaining)] if remaining > 0 else []) + symbols
-    return build_cost_string(out) or f"{{{mana_value}}}"
+    return _adapt_to_mana_value(rng.choice(corpus.mana_costs_by_cmc[nearest]), mana_value)
