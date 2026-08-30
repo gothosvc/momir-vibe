@@ -14,11 +14,10 @@ nearest mana value we do have data for.
 """
 from __future__ import annotations
 
-import itertools
 import random
 import re
 
-from .corpus import Corpus
+from .corpus import Corpus, mana_value_weight
 
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
 _COLOR_ORDER = "WUBRG"
@@ -61,8 +60,13 @@ def synthesize_mana_cost(
         return "{0}"
 
     if mayhem:
-        pool = list(itertools.chain.from_iterable(corpus.mana_costs_by_cmc.values()))
-        return rng.choice(pool) if pool else build_cost_string([str(mana_value)])
+        items: list[str] = []
+        weights: list[float] = []
+        for cmc, pool in corpus.mana_costs_by_cmc.items():
+            weight = mana_value_weight(cmc, mana_value)
+            items.extend(pool)
+            weights.extend([weight] * len(pool))
+        return rng.choices(items, weights=weights)[0] if items else build_cost_string([str(mana_value)])
 
     exact_matches = corpus.mana_costs_by_cmc.get(mana_value)
     if exact_matches:

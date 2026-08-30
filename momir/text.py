@@ -18,7 +18,7 @@ import itertools
 import random
 from collections import Counter
 
-from .corpus import Corpus, has_ungrounded_x
+from .corpus import Corpus, has_ungrounded_x, mana_value_weight
 from .markov import WordMarkovChain
 
 KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasionally more
@@ -68,10 +68,15 @@ MAX_BORROW_RADIUS = 32
 
 def _keyword_pool(corpus: Corpus, mana_value: int, mayhem: bool) -> tuple[Counter, dict[str, list[str]]]:
     """The (keyword name -> count, keyword name -> observed values) pair to
-    draw from -- flattened across every mana value under mayhem, else the
-    requested one if it has any, else the nearest one that does."""
+    draw from -- under mayhem, pooled across every mana value but weighted
+    by distance from mana_value (see corpus.py's mana_value_weight), else
+    the requested one if it has any, else the nearest one that does."""
     if mayhem:
-        names = sum(corpus.keywords_by_cmc.values(), Counter())
+        names: Counter = Counter()
+        for cmc, counter in corpus.keywords_by_cmc.items():
+            weight = mana_value_weight(cmc, mana_value)
+            for name, count in counter.items():
+                names[name] += count * weight
         values: dict[str, list[str]] = {}
         for per_cmc in corpus.keyword_values_by_cmc.values():
             for name, vals in per_cmc.items():
