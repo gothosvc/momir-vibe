@@ -171,7 +171,10 @@ def build_mayhem_text_chain(corpus: Corpus) -> WordMarkovChain:
 # noun in "+1/+1 counter", only occasionally the verb "counter target
 # spell") where the false-positive rate from misreading the noun would
 # outweigh the real catches.
-_DANGLING_OBJECT_VERBS = {"return", "exile", "destroy", "tap", "untap", "sacrifice", "bounce", "regenerate", "put"}
+_DANGLING_OBJECT_VERBS = {
+    "return", "exile", "destroy", "tap", "untap", "sacrifice", "bounce", "regenerate", "put",
+    "fight", "fights", "goad", "detain",
+}
 # Words that resolve a dangling verb's object phrase -- once one of these
 # shows up, the clause has somewhere for its object to land. "and"/"or" are
 # in here for "put"'s sake: real oracle text routinely resolves its object
@@ -264,16 +267,21 @@ def _is_complete_sentence(sentence: str, shape: str | None) -> bool:
     if has_ungrounded_x(sentence, shape or ""):
         return False
     dangling = False
+    prev_core = ""
     for word in sentence.split():
         core = word.strip(".,!?:;").lower()
         if dangling and core in _CLAUSE_SUBJECT_VERBS:
             return False
         if core in _DANGLING_OBJECT_VERBS:
             dangling = True
-        elif core in _OBJECT_RESOLVERS:
+        # "to" in "up to N target creatures" is cardinality, not the
+        # object-resolving "return X TO Y" -- the object hasn't even been
+        # named yet at that "to", so it doesn't get to resolve anything.
+        elif core in _OBJECT_RESOLVERS and not (core == "to" and prev_core == "up"):
             dangling = False
         if any(punct in word for punct in ",:.!?"):
             dangling = False
+        prev_core = core
     return True
 
 
