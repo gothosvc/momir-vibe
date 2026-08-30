@@ -69,7 +69,8 @@ main {
   color: var(--muted);
 }
 
-.controls input {
+.controls input,
+.controls select {
   width: 5rem;
   padding: 0.45rem 0.5rem;
   border-radius: 6px;

@@ -14,7 +14,9 @@ Rules text generation: a blend of two techniques.
 """
 from __future__ import annotations
 
+import itertools
 import random
+from collections import Counter
 
 from .corpus import Corpus, has_ungrounded_x
 from .markov import WordMarkovChain
@@ -64,25 +66,35 @@ MIN_TRAINING_SENTENCES = 1000
 MAX_BORROW_RADIUS = 32
 
 
-def _keyword_cmc(corpus: Corpus, mana_value: int) -> int | None:
-    """The mana value to actually pull keyword data (names and values) from
-    -- the requested one if it has any, else the nearest one that does."""
-    if corpus.keywords_by_cmc.get(mana_value):
-        return mana_value
-    available = [cmc for cmc, counter in corpus.keywords_by_cmc.items() if counter]
-    if not available:
-        return None
-    return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
+def _keyword_pool(corpus: Corpus, mana_value: int, mayhem: bool) -> tuple[Counter, dict[str, list[str]]]:
+    """The (keyword name -> count, keyword name -> observed values) pair to
+    draw from -- flattened across every mana value under mayhem, else the
+    requested one if it has any, else the nearest one that does."""
+    if mayhem:
+        names = sum(corpus.keywords_by_cmc.values(), Counter())
+        values: dict[str, list[str]] = {}
+        for per_cmc in corpus.keyword_values_by_cmc.values():
+            for name, vals in per_cmc.items():
+                values.setdefault(name, []).extend(vals)
+        return names, values
+
+    cmc = mana_value if corpus.keywords_by_cmc.get(mana_value) else None
+    if cmc is None:
+        available = [c for c, counter in corpus.keywords_by_cmc.items() if counter]
+        if not available:
+            return Counter(), {}
+        cmc = min(available, key=lambda c: (abs(c - mana_value), c))
+    return corpus.keywords_by_cmc[cmc], corpus.keyword_values_by_cmc.get(cmc, {})
 
 
-def _keyword_text(corpus: Corpus, cmc: int, name: str, card_name: str, rng: random.Random) -> str:
+def _keyword_text(values_pool: dict[str, list[str]], name: str, card_name: str, rng: random.Random) -> str:
     """The full printed keyword line, e.g. "Ward" -> "Ward {2}" -- sampled
-    from real observed values at this mana value so a keyword that always
-    prints with a cost/parameter never shows up bare. Values carry their own
-    leading whitespace (or lack of it) verbatim from the source card -- see
+    from real observed values so a keyword that always prints with a
+    cost/parameter never shows up bare. Values carry their own leading
+    whitespace (or lack of it) verbatim from the source card -- see
     corpus.py's _keyword_occurrence -- so a plain concatenation reproduces
     the real spacing either way. "~" substitution mirrors generate_rules_text."""
-    values = corpus.keyword_values_by_cmc.get(cmc, {}).get(name)
+    values = values_pool.get(name)
     if not values:
         return name
     value = rng.choice(values)
@@ -91,18 +103,17 @@ def _keyword_text(corpus: Corpus, cmc: int, name: str, card_name: str, rng: rand
 
 
 def generate_keywords(
-    corpus: Corpus, mana_value: int, card_name: str, rng: random.Random | None = None
+    corpus: Corpus, mana_value: int, card_name: str, rng: random.Random | None = None, mayhem: bool = False
 ) -> list[str]:
     rng = rng or random
-    cmc = _keyword_cmc(corpus, mana_value)
-    if cmc is None:
+    pool, values_pool = _keyword_pool(corpus, mana_value, mayhem)
+    if not pool:
         return []
 
     count = rng.choice(KEYWORD_COUNT_WEIGHTS)
     if count == 0:
         return []
 
-    pool = corpus.keywords_by_cmc[cmc]
     names = list(pool.keys())
     weights = list(pool.values())
 
@@ -111,7 +122,7 @@ def generate_keywords(
         pick = rng.choices(names, weights=weights)[0]
         if pick not in chosen:
             chosen.append(pick)
-    return [_keyword_text(corpus, cmc, name, card_name, rng) for name in chosen]
+    return [_keyword_text(values_pool, name, card_name, rng) for name in chosen]
 
 
 def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[tuple[str, int, str]]:
@@ -137,6 +148,15 @@ def build_text_chains(corpus: Corpus, mana_values: range) -> dict[int, WordMarko
         chain.train(_sentences_for_mana_value(corpus, mana_value))
         chains[mana_value] = chain
     return chains
+
+
+def build_mayhem_text_chain(corpus: Corpus) -> WordMarkovChain:
+    """A single chain trained on sentences from every mana value, for
+    mayhem=text/full -- unlike build_text_chains this doesn't vary by mana
+    value, so it's built once rather than per mana value."""
+    chain = WordMarkovChain(order=TEXT_MARKOV_ORDER)
+    chain.train(list(itertools.chain.from_iterable(corpus.sentences_by_cmc.values())))
+    return chain
 
 
 # Verbs that always open a directive clause needing a completed object
