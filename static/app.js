@@ -247,7 +247,10 @@ async function generate(manaValue) {
   errorEl.hidden = true;
   button.disabled = true;
   try {
-    const res = await fetch(`/cards/generate?mana_value=${encodeURIComponent(manaValue)}`);
+    const mayhem = document.getElementById("mayhem").value;
+    const res = await fetch(
+      `/cards/generate?mana_value=${encodeURIComponent(manaValue)}&mayhem=${encodeURIComponent(mayhem)}`
+    );
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new Error(errorMessage(body, res.status));

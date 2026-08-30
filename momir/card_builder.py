@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import random
+from typing import Literal
 
 from . import art, colors, stats, text, types
 from .codec import encode_card
@@ -21,6 +22,8 @@ RARITY_WEIGHTS = {"common": 40, "uncommon": 30, "rare": 20, "mythic": 10}
 MIN_MANA_VALUE = 0
 MAX_MANA_VALUE = 16
 
+Mayhem = Literal["off", "text", "full"]
+
 
 class CardGenerator:
     def __init__(self, corpus: Corpus | None = None) -> None:
@@ -31,6 +34,10 @@ class CardGenerator:
         self.text_chains: dict[int, WordMarkovChain] = text.build_text_chains(
             self.corpus, range(MIN_MANA_VALUE, MAX_MANA_VALUE + 1)
         )
+        # mayhem=text/full trains on sentences from every mana value, so it
+        # doesn't vary by mana value like text_chains above -- one chain
+        # covers every request.
+        self.mayhem_text_chain: WordMarkovChain = text.build_mayhem_text_chain(self.corpus)
         self._next_collector_number = 1
 
     def _rarity(self, rng: random.Random) -> str:
@@ -43,23 +50,26 @@ class CardGenerator:
         self._next_collector_number += 1
         return str(number)
 
-    def generate(self, mana_value: int, rng: random.Random | None = None) -> Card:
+    def generate(self, mana_value: int, rng: random.Random | None = None, mayhem: Mayhem = "off") -> Card:
         if not (MIN_MANA_VALUE <= mana_value <= MAX_MANA_VALUE):
             raise ValueError(
                 f"mana_value must be between {MIN_MANA_VALUE} and {MAX_MANA_VALUE}, got {mana_value}"
             )
 
         rng = rng or random
+        full_mayhem = mayhem == "full"
+        text_mayhem = mayhem in ("text", "full")
 
         name = generate_name(self.name_chains, rng=rng)
-        mana_cost = colors.synthesize_mana_cost(self.corpus, mana_value, rng=rng)
+        mana_cost = colors.synthesize_mana_cost(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
         symbols = colors.parse_symbols(mana_cost)
         card_colors = colors.colors_in_symbols(symbols)
 
-        type_line = types.generate_type_line(self.corpus, mana_value, rng=rng)
-        power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng)
-        keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng)
-        rules_text = text.generate_rules_text(self.text_chains[mana_value], name, rng=rng)
+        type_line = types.generate_type_line(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
+        power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
+        keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
+        text_chain = self.mayhem_text_chain if text_mayhem else self.text_chains[mana_value]
+        rules_text = text.generate_rules_text(text_chain, name, rng=rng)
 
         # A real creature's art, matched by color identity -- unrelated to
         # this card's name/text, just a thematically plausible picture. None

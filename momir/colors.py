@@ -14,6 +14,7 @@ nearest mana value we do have data for.
 """
 from __future__ import annotations
 
+import itertools
 import random
 import re
 
@@ -51,11 +52,17 @@ def _nearest_available_cmc(corpus: Corpus, mana_value: int) -> int | None:
     return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
 
 
-def synthesize_mana_cost(corpus: Corpus, mana_value: int, rng: random.Random | None = None) -> str:
+def synthesize_mana_cost(
+    corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False
+) -> str:
     rng = rng or random
 
     if mana_value <= 0:
         return "{0}"
+
+    if mayhem:
+        pool = list(itertools.chain.from_iterable(corpus.mana_costs_by_cmc.values()))
+        return rng.choice(pool) if pool else build_cost_string([str(mana_value)])
 
     exact_matches = corpus.mana_costs_by_cmc.get(mana_value)
     if exact_matches:

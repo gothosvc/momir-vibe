@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+from collections import Counter
 
 from .corpus import Corpus
 
@@ -11,7 +12,10 @@ from .corpus import Corpus
 SECOND_TYPE_CHANCE = 0.4
 
 
-def _subtype_pool(corpus: Corpus, mana_value: int):
+def _subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False):
+    if mayhem:
+        return sum(corpus.subtypes_by_cmc.values(), Counter())
+
     pool = corpus.subtypes_by_cmc.get(mana_value)
     if pool:
         return pool
@@ -23,9 +27,11 @@ def _subtype_pool(corpus: Corpus, mana_value: int):
     return corpus.subtypes_by_cmc[nearest]
 
 
-def generate_type_line(corpus: Corpus, mana_value: int, rng: random.Random | None = None) -> str:
+def generate_type_line(
+    corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False
+) -> str:
     rng = rng or random
-    pool = _subtype_pool(corpus, mana_value)
+    pool = _subtype_pool(corpus, mana_value, mayhem=mayhem)
     if not pool:
         return "Creature"
 

@@ -2,7 +2,7 @@
 The local API server.
 
     GET /                               -> the card-mockup web page (static/)
-    GET /cards/generate?mana_value=4    -> a single generated Card
+    GET /cards/generate?mana_value=4    -> a single generated Card (optional &mayhem=text|full)
     GET /cards/decode?code=...          -> reconstruct a Card from its share_code
     POST /cards/save                    -> persist a share_code, get a short id back
     GET /c/{id}                         -> the Card saved under that short id
@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
 from . import store
-from .card_builder import MAX_MANA_VALUE, MIN_MANA_VALUE, get_generator
+from .card_builder import MAX_MANA_VALUE, MIN_MANA_VALUE, Mayhem, get_generator
 from .codec import CardCodeError, decode_card
 from .corpus import SUPPORTED_FORMATS, get_corpus
 from .models import Card, SaveCardRequest, SaveCardResponse
@@ -52,6 +52,13 @@ FORMAT_QUERY = Query(
     None,
     description="Restrict training data to cards legal in this format. Omit for the full, unrestricted card pool.",
 )
+MAYHEM_QUERY = Query(
+    "off",
+    description="Break mana-value scoping on purpose. 'text' samples rules text/keywords from the whole "
+    "(format-filtered) pool instead of just this mana value; 'full' also does that for mana cost, "
+    "power/toughness, and type line, so the card can come back wildly off-curve. 'off' (default) is normal, "
+    "curve-appropriate generation.",
+)
 
 
 @app.get("/health")
@@ -65,9 +72,11 @@ def health() -> dict:
 
 
 @app.get("/cards/generate", response_model=Card)
-def generate_card(mana_value: int = MANA_VALUE_QUERY, format: Format | None = FORMAT_QUERY) -> Card:
+def generate_card(
+    mana_value: int = MANA_VALUE_QUERY, format: Format | None = FORMAT_QUERY, mayhem: Mayhem = MAYHEM_QUERY
+) -> Card:
     try:
-        return get_generator(format).generate(mana_value)
+        return get_generator(format).generate(mana_value, mayhem=mayhem)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
