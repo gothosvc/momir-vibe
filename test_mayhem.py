@@ -5,7 +5,7 @@ Run directly: python test_mayhem.py
 import random
 from collections import Counter
 
-from momir.colors import synthesize_mana_cost
+from momir.colors import _is_generic, parse_symbols, synthesize_mana_cost
 from momir.corpus import Corpus, mana_value_weight
 from momir.stats import _nearest_pt_pool
 from momir.text import _keyword_pool
@@ -42,11 +42,16 @@ def main() -> None:
     assert names["Flying"] > names["Trample"] > 0, "mayhem keywords: reachable but distance-weighted"
     assert values["Trample"] == [""], "mayhem keyword values should carry over from other cmcs"
 
-    # A fixed seed keeps this deterministic -- the distant cost is still
-    # reachable (nonzero weight), just rarer, so a single draw isn't reliable.
+    # Regression: a template borrowed from a far cmc (here, cmc 9's
+    # "{7}{U}{U}") must be rebuilt to the requested mana value, not returned
+    # as-is -- a mayhem=full card whose printed cost doesn't sum to its own
+    # mana_value looks broken, not chaotic.
     rng = random.Random(0)
-    costs = {synthesize_mana_cost(corpus, mana_value=1, rng=rng, mayhem=True) for _ in range(200)}
-    assert costs == {"{W}", "{7}{U}{U}"}, "mayhem mana cost pool should still reach a cost from another cmc"
+    for _ in range(200):
+        cost = synthesize_mana_cost(corpus, mana_value=4, rng=rng, mayhem=True)
+        symbols = parse_symbols(cost)
+        total = sum(int(s) if _is_generic(s) else 1 for s in symbols)
+        assert total == 4, f"mayhem mana cost {cost} sums to {total}, not the requested mana value"
 
     # non-mayhem stays scoped to the requested mana value
     scoped_pool, scoped_weights = _nearest_pt_pool(corpus, mana_value=1, mayhem=False)
