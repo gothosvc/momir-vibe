@@ -7,3 +7,5 @@ data/saved_cards.db-*
 .DS_Store
 .claude/settings.local.json
 todo.txt
+hosting.md
+CLAUDE.md
