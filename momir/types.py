@@ -4,7 +4,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 
-from .corpus import Corpus
+from .corpus import Corpus, mana_value_weight
 
 # Momir games are famous for absurd type combos ("Zombie Dragon Wizard"), so
 # we don't try to keep subtype pairings "sensible" -- we just weight by how
@@ -14,7 +14,12 @@ SECOND_TYPE_CHANCE = 0.4
 
 def _subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False):
     if mayhem:
-        return sum(corpus.subtypes_by_cmc.values(), Counter())
+        combined: Counter = Counter()
+        for cmc, counter in corpus.subtypes_by_cmc.items():
+            weight = mana_value_weight(cmc, mana_value)
+            for name, count in counter.items():
+                combined[name] += count * weight
+        return combined
 
     pool = corpus.subtypes_by_cmc.get(mana_value)
     if pool:

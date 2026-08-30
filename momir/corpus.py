@@ -225,6 +225,13 @@ class Corpus:
         return sorted(self.mana_costs_by_cmc.keys())
 
 
+def mana_value_weight(cmc: int, mana_value: int) -> float:
+    """How much a cmc bucket should contribute to a mayhem pool centered on
+    mana_value -- 1.0 at distance 0, decaying but never reaching zero, so
+    mayhem still favors nearby mana values without fully excluding any."""
+    return 1.0 / (1 + abs(cmc - mana_value))
+
+
 def _numeric(value) -> float | None:
     try:
         return float(value)
