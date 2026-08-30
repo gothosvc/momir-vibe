@@ -41,8 +41,8 @@ Sentences are also kept separate by construct — triggered / activated / static
 Everything above is deliberately scoped to the requested mana value, so cards feel on-curve. **Mayhem** breaks that scoping on purpose:
 
 - `off` (default) — normal, curve-appropriate generation.
-- `text` — keywords and rules text are sampled from the whole (format-filtered) pool instead of just the requested mana value, distance-weighted so nearby mana values still contribute more than far ones (`mana_value_weight` in `momir/corpus.py`). Mana cost, type line, and power/toughness stay curve-appropriate.
-- `full` — the same distance-weighted pooling also applies to mana cost, type line, and power/toughness, so the card can come back wildly off-curve in every respect, not just its text.
+- `text` — keywords and rules text are sampled from the whole (format-filtered) pool instead of just the requested mana value, distance-weighted so nearby mana values still contribute more than far ones (`mana_value_weight` in `momir/corpus.py`). Type line and power/toughness stay curve-appropriate.
+- `full` — the same distance-weighted pooling also applies to mana cost, type line, and power/toughness. The mana cost still totals the mana value you requested, but its colored-pip pattern is now borrowed from creatures at any mana value (e.g. a 2-drop can come back with the pip intensity of a 6-drop bomb); type line and power/toughness are pooled the same way, so the card can come back wildly off-curve in flavor and stats without its actual mana value changing.
 
 `format=` still applies under mayhem — it only widens *which mana values* get pooled from, not which format's legal pool.
 
