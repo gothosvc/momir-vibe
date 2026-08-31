@@ -7,20 +7,13 @@ Two flavors are used elsewhere in the generator:
   gives generated names their "sounds like Magic but isn't" quality (e.g.
   training on "Serra Angel" + "Shivan Dragon" can yield "Shivan Angel").
 
-- ``WordMarkovChain``: word-level, trained on sentences pulled from real
-  oracle text. Used to generate loose, flavorful extra rules text. Training
-  sentences carry a "position" (their index within the source card's oracle
-  text) and a "shape" (its construct type -- trigger/activated/static; see
-  momir/corpus.py's _sentence_shape). Generation can request either:
-
-  - Position keeps generated opening lines sounding like real openers,
-    instead of orphaned continuation clauses like "If a spell is countered
-    this way, ..." that only make sense following the sentence that set
-    them up.
-  - Shape stops a generated sentence from wandering mid-generation from
-    e.g. a triggered ability into an unrelated activated ability's "cost:"
-    clause. Transitions are modeled separately per shape, so a chain that
-    starts as one construct only ever continues as that construct.
+- ``WordMarkovChain``: word-level, trained on real name words. Used to
+  generate ordinary (non-legendary) creature names by recombining them --
+  see momir/names.py. Training samples carry a "position" and a "shape" tag
+  (general-purpose grouping axes any caller can use to keep transitions
+  scoped to same-position/same-shape samples only; momir/names.py tags every
+  name with the same constant shape, since names don't have a construct the
+  way rules text once did, so that axis is a no-op for its current caller).
 """
 from __future__ import annotations
 
@@ -84,15 +77,14 @@ _DANGLING_STOPWORDS = {"of", "the", "and", "an", "a"}
 
 
 class WordMarkovChain:
-    """Word-level Markov chain over tokenized sentences (e.g. oracle text).
+    """Word-level Markov chain over tokenized samples (currently: common
+    creature name words -- see momir/names.py).
 
-    Every sentence is tagged with a "shape" at training time (callers that
-    don't care about shape-splitting -- e.g. name generation -- can just tag
-    everything with the same constant). Transitions are modeled *separately
+    Every sample is tagged with a "shape" at training time; a caller that
+    doesn't care about shape-splitting (like name generation) can just tag
+    everything with the same constant. Transitions are modeled *separately
     per shape*, not just started separately, so mid-generation the chain can
-    never wander from one shape into another -- that cross-shape wandering is
-    what produces nonsense like a triggered ability's text fusing into an
-    unrelated activated ability's "cost:" clause.
+    never wander from one shape into another.
     """
 
     def __init__(self, order: int = 2) -> None:
