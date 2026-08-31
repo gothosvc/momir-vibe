@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Riders of the Guildpact, a 2-mana white rare with Menace, Flying, and an activated pump ability">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Pakandybuck, a 5-mana black mythic Drake with Flying, Prototype, and an attack trigger that doubles power">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Dire Fleet Interloper, an 8-mana green mythic Dinosaur with two enter-the-battlefield triggers">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Historian of Zhalfir, a 2-mana green/white common Wall Human with a counter-granting trigger referencing Faerie and Dwarf creatures">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Long-Bodied Grey Dog, a 3-mana red/green common Human with Reach, a Channel ability, and two activated abilities">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Disruptor of Currents, a 12-mana green common Mutant Kraken with Haste, Flying, a has-flying reference, and a granted-keywords ability">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
@@ -28,9 +28,11 @@ How often a generated card comes back legendary mirrors how often real creatures
 Rules text is a mix of:
 
 - **Keyword abilities**, sampled by how often they appear at that mana value. Keywords are restricted to ones we have real printed text for, pruned of one-off card-specific ability words (see `MIN_KEYWORD_OCCURRENCES` in `momir/corpus.py`), and given a real observed value/cost when the keyword takes one (e.g. "Ward" → "Ward {2}") so a keyword never shows up incomplete.
-- **Generated sentences**, trained only on oracle text from real creatures at that same mana value (widening to nearby mana values only if there isn't enough data). A 1-drop's generated text is never built from words that only ever show up on eight-mana bombs.
+- **Extra rules text**, sampled from real oracle sentences of real creatures at that same mana value (widening to nearby mana values only if there isn't enough data). A 1-drop's generated text is never built from a sentence that only ever shows up on eight-mana bombs. A generated line is either a whole real sentence verbatim, or — for triggered/activated abilities — a real condition/cost half from one sentence recombined with a real effect half from a different same-construct sentence, split only at that construct's own grammatical seam (the comma in "Whenever X, Y.", the colon in "Cost: Y."). Either way every line is grammatical by construction: nothing is ever stitched together below that seam, so there's no splice point for two unrelated sentences to fuse into nonsense.
 
-Sentences are also kept separate by construct — triggered / activated / static ability — during both training and generation, so a generated line can't wander mid-sentence from one construct into another. Line-level templating that only makes sense inside its own card frame (Saga chapters, Class level headers, Case/d20-roll threshold rows, Choose-one's bullet options) is filtered out of training entirely, rather than left for the chain to mangle.
+Sentences are kept separate by construct — triggered / activated / static ability — and by position within the source card's oracle text, so a generated block reads as one consistent construct (never a triggered ability's condition paired with an unrelated activated ability's cost) and opens with a real opening line rather than an orphaned continuation clause. Line-level templating that only makes sense inside its own card frame (Saga chapters, Class level headers, Case/d20-roll threshold rows, Choose-one's bullet options) is filtered out entirely, rather than left for generation to mangle.
+
+A picked line then gets a reroll pass: any number (a P/T delta, a damage/life amount, a card/counter count), keyword-name reference ("creatures with **flying**"), or creature-subtype reference ("target **Human** creature") it contains is independently swapped for a different real value of the same kind, mined from the same mana-value pool. This is the source of most of the variety between two cards built from the same underlying sentence — and it's restricted to contexts a swap can't break: a mana cost's own digits, a token's count-and-noun pairing, and a keyword only ever seen as a header/verb/value-suffixed line (never a real "has X" reference) are all left untouched rather than guessed at. See `momir/text.py`.
 
 ### Everything else
 
@@ -87,7 +89,7 @@ Both generation endpoints also take an optional `format` param (`standard`, `pio
 
 `GET /cards/generate` additionally takes `mayhem` (`off` default, `text`, or `full`) — see "Mayhem mode" above.
 
-Legacy/Vintage aren't offered as filters — creatures are almost never banned there (~99% of all creatures are legal in both), so it'd barely narrow the pool at all. Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
+Legacy/Vintage aren't offered as filters — creatures are almost never banned there (~99% of all creatures are legal in both), so it'd barely narrow the pool at all. Each format's corpus, Markov chains, and sentence pools are built lazily on first request and cached from then on, same as the unrestricted pool built eagerly at startup.
 
 > **Note:** a Standard-scoped corpus is only as fresh as the last `data/fetch_cards.py` run. Standard rotates sets out over time, and this project never re-fetches on its own, so re-run the fetch occasionally if you're using `format=standard`. Modern/Pioneer don't have this problem, since bans are rare and don't expire.
 
@@ -117,7 +119,7 @@ curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
 
 ### Saving and sharing cards
 
-Every generated `Card` carries a `share_code` — a compact string (version tag + zlib-compressed, base64url-encoded JSON of the card's fields) that fully encodes the card. `GET /cards/decode?code=...` turns one back into the exact same `Card`, with no regeneration and no dependency on the corpus or Markov chains being unchanged since the card was made (see `momir/codec.py`).
+Every generated `Card` carries a `share_code` — a compact string (version tag + zlib-compressed, base64url-encoded JSON of the card's fields) that fully encodes the card. `GET /cards/decode?code=...` turns one back into the exact same `Card`, with no regeneration and no dependency on the corpus, Markov chains, or sentence pools being unchanged since the card was made (see `momir/codec.py`).
 
 That one primitive backs two things in the web page:
 
