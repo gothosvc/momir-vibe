@@ -10,6 +10,7 @@ Usage:
 """
 from __future__ import annotations
 
+import argparse
 import json
 import pathlib
 import time
@@ -78,13 +79,18 @@ def _get_with_retry(url: str, params: dict | None) -> dict:
     raise RuntimeError("unreachable")  # loop always returns or raises
 
 
-def fetch_all(max_cards: int | None = None) -> list[dict]:
+def fetch_all(max_cards: int | None = None, query: str = QUERY) -> list[dict]:
     cards: list[dict] = []
     url = SEARCH_URL
-    params: dict | None = {"q": QUERY, "unique": "cards", "order": "name"}
+    params: dict | None = {"q": query, "unique": "cards", "order": "name"}
 
     while url:
-        payload = _get_with_retry(url, params)
+        try:
+            payload = _get_with_retry(url, params)
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                break  # Scryfall 404s a zero-result search instead of returning an empty list
+            raise
 
         for raw in payload.get("data", []):
             # Skip double-faced/split cards' front-only weirdness and cards
@@ -121,9 +127,28 @@ def fetch_all(max_cards: int | None = None) -> list[dict]:
 
 
 def main() -> None:
-    print(f"Fetching creature cards from Scryfall ({QUERY!r})...")
-    cards = fetch_all()
-    print(f"Fetched {len(cards)} unique creature cards.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--set",
+        metavar="CODE",
+        help="only fetch this set (Scryfall set code, e.g. 'woe') and merge "
+        "it into the existing cache instead of refetching everything",
+    )
+    args = parser.parse_args()
+
+    query = f"{QUERY} set:{args.set}" if args.set else QUERY
+    print(f"Fetching creature cards from Scryfall ({query!r})...")
+    fetched = fetch_all(query=query)
+    print(f"Fetched {len(fetched)} unique creature cards.")
+
+    if args.set and CACHE_PATH.exists():
+        existing = json.loads(CACHE_PATH.read_text())
+        by_name = {c["name"]: c for c in existing}
+        by_name.update({c["name"]: c for c in fetched})
+        cards = list(by_name.values())
+        print(f"Merged into existing cache: {len(cards)} total cards.")
+    else:
+        cards = fetched
 
     CACHE_PATH.write_text(json.dumps(cards, indent=0))
     print(f"Wrote cache to {CACHE_PATH} ({CACHE_PATH.stat().st_size / 1024:.0f} KB)")
