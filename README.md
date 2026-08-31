@@ -68,6 +68,12 @@ pip install -r requirements.txt
 python -m data.fetch_cards
 ```
 
+Pass `--set <code>` (a Scryfall set code, e.g. `woe`) to fetch just one newly-released set and merge it into the existing cache by card name, instead of refetching the whole corpus:
+
+```bash
+python -m data.fetch_cards --set woe
+```
+
 ## Run the API
 
 ```bash
@@ -153,5 +159,5 @@ static/                 card mockup web page (vanilla HTML/CSS/JS, no build step
 
 - Generated rules text is flavorful, not mechanically enforced — a generated "Whenever this attacks, draw a card" won't actually do anything in any digital sense. This is a card *generator*, not a game engine.
 - Mana value range is capped at 0–16 (matches the real creature card population closely enough to generate from).
-- Re-running `python -m data.fetch_cards` refreshes the corpus with whatever's newest on Scryfall; delete `data/cards_cache.json` first if you want a completely clean pull.
+- Re-running `python -m data.fetch_cards` refreshes the corpus with whatever's newest on Scryfall; delete `data/cards_cache.json` first if you want a completely clean pull. `--set <code>` fetches and merges in just one set instead, for topping up the cache after a new release without a full refetch.
 - Card art is real, printed Magic art, borrowed for a fake card under a fake, unrelated name — that mismatch is the joke, not a bug. A `data/cards_cache.json` fetched before this feature existed has no art data at all; generated cards fall back to the plain placeholder box until you re-run `python -m data.fetch_cards`.
