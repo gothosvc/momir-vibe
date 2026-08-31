@@ -29,15 +29,23 @@ class CardGenerator:
     def __init__(self, corpus: Corpus | None = None) -> None:
         self.corpus = corpus or get_corpus()
         self.name_chains: NameChains = build_name_chains(self.corpus)
+        # Detection vocab for the keyword-name/creature-subtype reroll pass
+        # -- global (doesn't vary by mana value), built once and fed into
+        # every sentence pool below so each pool's keyword_refs/subtype_refs
+        # only include names actually seen in a safe context. See
+        # momir/text.py.
+        self.reroll_vocab: text.RerollVocab = text.build_reroll_vocab(self.corpus)
         # One sentence pool per mana value, so a 1-drop's generated text is
         # only ever sampled from what real 1-drops say -- see momir/text.py.
         self.sentence_pools: dict[int, text.SentencePool] = text.build_sentence_pools(
-            self.corpus, range(MIN_MANA_VALUE, MAX_MANA_VALUE + 1)
+            self.corpus, range(MIN_MANA_VALUE, MAX_MANA_VALUE + 1), self.reroll_vocab
         )
         # mayhem=text/full pools sentences from every mana value, so it
         # doesn't vary by mana value like sentence_pools above -- one pool
         # covers every request.
-        self.mayhem_sentence_pool: text.SentencePool = text.build_mayhem_sentence_pool(self.corpus)
+        self.mayhem_sentence_pool: text.SentencePool = text.build_mayhem_sentence_pool(
+            self.corpus, self.reroll_vocab
+        )
         self._next_collector_number = 1
 
     def _rarity(self, rng: random.Random) -> str:
@@ -69,7 +77,7 @@ class CardGenerator:
         power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
         pool = self.mayhem_sentence_pool if text_mayhem else self.sentence_pools[mana_value]
-        rules_text = text.generate_rules_text(pool, name, rng=rng)
+        rules_text = text.generate_rules_text(pool, name, rng=rng, vocab=self.reroll_vocab)
 
         # A real creature's art, matched by color identity -- unrelated to
         # this card's name/text, just a thematically plausible picture. None

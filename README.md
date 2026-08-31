@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Riders of the Guildpact, a 2-mana white rare with Menace, Flying, and an activated pump ability">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Pakandybuck, a 5-mana black mythic Drake with Flying, Prototype, and an attack trigger that doubles power">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Dire Fleet Interloper, an 8-mana green mythic Dinosaur with two enter-the-battlefield triggers">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Historian of Zhalfir, a 2-mana green/white common Wall Human with a counter-granting trigger referencing Faerie and Dwarf creatures">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Long-Bodied Grey Dog, a 3-mana red/green common Human with Reach, a Channel ability, and two activated abilities">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Disruptor of Currents, a 12-mana green common Mutant Kraken with Haste, Flying, a has-flying reference, and a granted-keywords ability">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
@@ -31,6 +31,8 @@ Rules text is a mix of:
 - **Extra rules text**, sampled from real oracle sentences of real creatures at that same mana value (widening to nearby mana values only if there isn't enough data). A 1-drop's generated text is never built from a sentence that only ever shows up on eight-mana bombs. A generated line is either a whole real sentence verbatim, or — for triggered/activated abilities — a real condition/cost half from one sentence recombined with a real effect half from a different same-construct sentence, split only at that construct's own grammatical seam (the comma in "Whenever X, Y.", the colon in "Cost: Y."). Either way every line is grammatical by construction: nothing is ever stitched together below that seam, so there's no splice point for two unrelated sentences to fuse into nonsense.
 
 Sentences are kept separate by construct — triggered / activated / static ability — and by position within the source card's oracle text, so a generated block reads as one consistent construct (never a triggered ability's condition paired with an unrelated activated ability's cost) and opens with a real opening line rather than an orphaned continuation clause. Line-level templating that only makes sense inside its own card frame (Saga chapters, Class level headers, Case/d20-roll threshold rows, Choose-one's bullet options) is filtered out entirely, rather than left for generation to mangle.
+
+A picked line then gets a reroll pass: any number (a P/T delta, a damage/life amount, a card/counter count), keyword-name reference ("creatures with **flying**"), or creature-subtype reference ("target **Human** creature") it contains is independently swapped for a different real value of the same kind, mined from the same mana-value pool. This is the source of most of the variety between two cards built from the same underlying sentence — and it's restricted to contexts a swap can't break: a mana cost's own digits, a token's count-and-noun pairing, and a keyword only ever seen as a header/verb/value-suffixed line (never a real "has X" reference) are all left untouched rather than guessed at. See `momir/text.py`.
 
 ### Everything else
 
