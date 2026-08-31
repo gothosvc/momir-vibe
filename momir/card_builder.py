@@ -2,8 +2,9 @@
 The generator itself: wires the corpus + all the sub-generators together into
 a single object that produces complete, playable-looking creature cards.
 
-Training the Markov chains happens once, at construction time -- generating
-an individual card is then cheap and can happen on every API request.
+Training the name Markov chains and building the sentence pools happens
+once, at construction time -- generating an individual card is then cheap
+and can happen on every API request.
 """
 from __future__ import annotations
 
@@ -14,7 +15,6 @@ from typing import Literal
 from . import art, colors, stats, text, types
 from .codec import encode_card
 from .corpus import Corpus, get_corpus
-from .markov import WordMarkovChain
 from .models import Card
 from .names import NameChains, build_name_chains, generate_name
 
@@ -29,15 +29,15 @@ class CardGenerator:
     def __init__(self, corpus: Corpus | None = None) -> None:
         self.corpus = corpus or get_corpus()
         self.name_chains: NameChains = build_name_chains(self.corpus)
-        # One text chain per mana value, so a 1-drop's generated text is only
-        # ever trained on what real 1-drops say -- see momir/text.py.
-        self.text_chains: dict[int, WordMarkovChain] = text.build_text_chains(
+        # One sentence pool per mana value, so a 1-drop's generated text is
+        # only ever sampled from what real 1-drops say -- see momir/text.py.
+        self.sentence_pools: dict[int, text.SentencePool] = text.build_sentence_pools(
             self.corpus, range(MIN_MANA_VALUE, MAX_MANA_VALUE + 1)
         )
-        # mayhem=text/full trains on sentences from every mana value, so it
-        # doesn't vary by mana value like text_chains above -- one chain
+        # mayhem=text/full pools sentences from every mana value, so it
+        # doesn't vary by mana value like sentence_pools above -- one pool
         # covers every request.
-        self.mayhem_text_chain: WordMarkovChain = text.build_mayhem_text_chain(self.corpus)
+        self.mayhem_sentence_pool: text.SentencePool = text.build_mayhem_sentence_pool(self.corpus)
         self._next_collector_number = 1
 
     def _rarity(self, rng: random.Random) -> str:
@@ -68,8 +68,8 @@ class CardGenerator:
         type_line = types.generate_type_line(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
         power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
-        text_chain = self.mayhem_text_chain if text_mayhem else self.text_chains[mana_value]
-        rules_text = text.generate_rules_text(text_chain, name, rng=rng)
+        pool = self.mayhem_sentence_pool if text_mayhem else self.sentence_pools[mana_value]
+        rules_text = text.generate_rules_text(pool, name, rng=rng)
 
         # A real creature's art, matched by color identity -- unrelated to
         # this card's name/text, just a thematically plausible picture. None
@@ -103,7 +103,8 @@ class CardGenerator:
 @functools.lru_cache(maxsize=None)
 def get_generator(legal_in: str | None = None) -> CardGenerator:
     """One process-wide singleton per `legal_in` value (see corpus.py's
-    SUPPORTED_FORMATS) -- building a CardGenerator means training every
-    Markov chain, which is the expensive part, so each distinct format is
-    only ever built once per server run rather than per request."""
+    SUPPORTED_FORMATS) -- building a CardGenerator means training the name
+    Markov chains and building every sentence pool, which is the expensive
+    part, so each distinct format is only ever built once per server run
+    rather than per request."""
     return CardGenerator(get_corpus(legal_in=legal_in))
