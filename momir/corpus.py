@@ -37,17 +37,16 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 # continuation clauses -- "If a spell is countered this way, exile it instead"
 # -- only make sense following the sentence that set them up; letting one get
 # picked as an opening line is what produces nonsensical-sounding generated
-# text. See momir/markov.py.
+# text. See momir/text.py's SentencePool.
 MAX_SENTENCE_POSITION = 2
 
 # Sentence "shape" -- the construct it belongs to -- kept separate from
-# position (see above) because splicing across *these* is what produces the
-# nonsense that reads as outright broken rather than just flavorfully odd:
-# a chain wandering from a triggered ability into an unrelated activated
-# ability's "cost:" clause mid-sentence, e.g. "...for each oil counter from
-# this artifact: Destroy target artifact you control another." Bucketing by
-# shape keeps a generated sentence's transitions confined to sentences of
-# the same construct. See momir/markov.py's WordMarkovChain.
+# position (see above) because mixing sentences across *these* is what
+# produces nonsense that reads as outright broken rather than just
+# flavorfully odd, e.g. pairing a triggered ability's condition with an
+# unrelated activated ability's "cost:" effect. Bucketing by shape keeps a
+# generated line's pieces confined to the same construct. See
+# momir/text.py's SentencePool.
 _TRIGGER_PREFIXES = ("When ", "Whenever ", "At the beginning of ")
 
 # Line-level templating that only makes sense inside its own card frame --
@@ -164,14 +163,13 @@ class Corpus:
     # its source card's oracle text, capped at MAX_SENTENCE_POSITION, and
     # shape is its construct type (see _sentence_shape). Three separate axes
     # of bucketing, each guarding against a different failure mode:
-    #   - per-cmc, so a 1-drop's generated text is trained only on what
+    #   - per-cmc, so a 1-drop's generated text is sampled only from what
     #     1-drops actually say, not phrases pulled in from eight-mana bombs;
     #   - per-position, so generated text opens with real openers rather
     #     than orphaned continuation clauses;
-    #   - per-shape, so a generated triggered ability doesn't splice
-    #     mid-sentence into an unrelated activated ability's cost:effect
-    #     clause.
-    # See momir/markov.py's WordMarkovChain and momir/text.py.
+    #   - per-shape, so a generated triggered ability's condition never pairs
+    #     with an unrelated activated ability's cost:effect clause.
+    # See momir/text.py's SentencePool.
     sentences_by_cmc: dict[int, list[tuple[str, int, str]]] = field(default_factory=lambda: defaultdict(list))
 
     # cmc -> list of raw mana_cost strings actually used at that cmc
@@ -312,13 +310,9 @@ _WHERE_X_RE = re.compile(r"\bwhere X (is|was)\b", re.IGNORECASE)
 
 def has_ungrounded_x(sentence: str, shape: str) -> bool:
     """True if `sentence` uses a bare X that isn't defined anywhere within
-    itself -- see the comment above for why that's unresolvable here. Public
-    (not `_`-prefixed) because momir/text.py runs this same check against
-    Markov-generated candidate sentences, not just real training ones: the
-    chain can still *splice* a grounded training sentence's opening onto an
-    unrelated continuation that drops its "where X is" tail before ever
-    generating it, producing a freshly-ungrounded sentence that was never
-    literally seen in training. See text.py's _is_complete_sentence."""
+    itself -- see the comment above for why that's unresolvable here. A
+    sentence failing this check is excluded from sentences_by_cmc entirely,
+    so generation (momir/text.py) never sees one."""
     if not _BARE_X_RE.search(sentence):
         return False
     if "{X}" in sentence or _WHERE_X_RE.search(sentence):
