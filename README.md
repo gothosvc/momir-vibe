@@ -36,6 +36,16 @@ Sentences are also kept separate by construct — triggered / activated / static
 
 **Mana cost, type line, and power/toughness** are likewise sampled from the actual distribution of real creatures at that mana value, so generated cards feel "on curve" even though nothing about them is real.
 
+### Mayhem mode
+
+Everything above is deliberately scoped to the requested mana value, so cards feel on-curve. **Mayhem** breaks that scoping on purpose:
+
+- `off` (default) — normal, curve-appropriate generation.
+- `text` — keywords and rules text are sampled from the whole (format-filtered) pool instead of just the requested mana value, distance-weighted so nearby mana values still contribute more than far ones (`mana_value_weight` in `momir/corpus.py`). Type line and power/toughness stay curve-appropriate.
+- `full` — the same distance-weighted pooling also applies to mana cost, type line, and power/toughness. The mana cost still totals the mana value you requested, but its colored-pip pattern is now borrowed from creatures at any mana value (e.g. a 2-drop can come back with the pip intensity of a 6-drop bomb); type line and power/toughness are pooled the same way, so the card can come back wildly off-curve in flavor and stats without its actual mana value changing.
+
+`format=` still applies under mayhem — it only widens *which mana values* get pooled from, not which format's legal pool.
+
 **Art** isn't generated at all — that'd be a whole separate project, and this one is about the text. Instead, each card borrows a real creature's art crop, picked by matching color identity (the same "sample the real distribution" approach used for mana cost/type/stats, just applied to art), so the picture is thematically plausible even though it's for a completely different, unrelated creature. The real artist is credited in the card's meta line rather than the usual joke placeholder. See `momir/art.py`.
 
 ## Runs locally
@@ -74,6 +84,8 @@ Serves at `http://127.0.0.1:8000` — open it in a browser for a small card mock
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
 
 Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool.
+
+`GET /cards/generate` additionally takes `mayhem` (`off` default, `text`, or `full`) — see "Mayhem mode" above.
 
 Legacy/Vintage aren't offered as filters — creatures are almost never banned there (~99% of all creatures are legal in both), so it'd barely narrow the pool at all. Each format's corpus and Markov chains are trained lazily on first request and cached from then on, same as the unrestricted pool trained eagerly at startup.
 
