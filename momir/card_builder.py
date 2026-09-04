@@ -68,16 +68,24 @@ class CardGenerator:
         full_mayhem = mayhem in ("full", "unhinged")
         text_mayhem = mayhem in ("text", "full", "unhinged")
         force_text = mayhem == "unhinged"
+        # 'full' still favors cmcs near mana_value (see corpus.py's
+        # mana_value_weight); 'unhinged' drops that too, pooling every cmc
+        # bucket with equal odds for mana cost/type line/power-toughness.
+        weighted = mayhem != "unhinged"
 
         name = generate_name(self.name_chains, rng=rng)
         mana_cost = colors.synthesize_mana_cost(
-            self.corpus, mana_value, rng=rng, mayhem=full_mayhem, weighted=mayhem != "unhinged"
+            self.corpus, mana_value, rng=rng, mayhem=full_mayhem, weighted=weighted
         )
         symbols = colors.parse_symbols(mana_cost)
         card_colors = colors.colors_in_symbols(symbols)
 
-        type_line = types.generate_type_line(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
-        power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
+        type_line = types.generate_type_line(
+            self.corpus, mana_value, rng=rng, mayhem=full_mayhem, weighted=weighted
+        )
+        power, toughness = stats.generate_power_toughness(
+            self.corpus, mana_value, rng=rng, mayhem=full_mayhem, weighted=weighted
+        )
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
         pool = self.mayhem_sentence_pool if text_mayhem else self.sentence_pools[mana_value]
         rules_text = text.generate_rules_text(pool, name, rng=rng, vocab=self.reroll_vocab, force=force_text)

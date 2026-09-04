@@ -12,10 +12,10 @@ SECOND_TYPE_CHANCE = 0.4
 
 
 def generate_type_line(
-    corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False
+    corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False, weighted: bool = True
 ) -> str:
     rng = rng or random
-    pool = subtype_pool(corpus, mana_value, mayhem=mayhem)
+    pool = subtype_pool(corpus, mana_value, mayhem=mayhem, weighted=weighted)
     if not pool:
         return "Creature"
 
