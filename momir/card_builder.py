@@ -70,7 +70,9 @@ class CardGenerator:
         force_text = mayhem == "unhinged"
 
         name = generate_name(self.name_chains, rng=rng)
-        mana_cost = colors.synthesize_mana_cost(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
+        mana_cost = colors.synthesize_mana_cost(
+            self.corpus, mana_value, rng=rng, mayhem=full_mayhem, weighted=mayhem != "unhinged"
+        )
         symbols = colors.parse_symbols(mana_cost)
         card_colors = colors.colors_in_symbols(symbols)
 

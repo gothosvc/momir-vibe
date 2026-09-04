@@ -69,8 +69,14 @@ def _adapt_to_mana_value(template: str, mana_value: int) -> str:
 
 
 def synthesize_mana_cost(
-    corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False
+    corpus: Corpus, mana_value: int, rng: random.Random | None = None, mayhem: bool = False, weighted: bool = True
 ) -> str:
+    """`weighted` only matters under mayhem: True (the default) favors cmcs
+    near mana_value (see mana_value_weight), same as every other mayhem
+    pool; False draws the color-pip template from every cmc bucket with
+    equal odds, for a mode that wants the pip pattern itself unmoored from
+    mana_value too, not just "nearby-favored" -- see momir/card_builder.py's
+    'unhinged' mayhem level."""
     rng = rng or random
 
     if mana_value <= 0:
@@ -78,11 +84,11 @@ def synthesize_mana_cost(
 
     if mayhem:
         items: list[str] = []
-        weights: list[float] = []
+        weights: list[float] | None = [] if weighted else None
         for cmc, pool in corpus.mana_costs_by_cmc.items():
-            weight = mana_value_weight(cmc, mana_value)
             items.extend(pool)
-            weights.extend([weight] * len(pool))
+            if weighted:
+                weights.extend([mana_value_weight(cmc, mana_value)] * len(pool))
         if not items:
             return build_cost_string([str(mana_value)])
         return _adapt_to_mana_value(rng.choices(items, weights=weights)[0], mana_value)
