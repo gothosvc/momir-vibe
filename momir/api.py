@@ -2,7 +2,7 @@
 The local API server.
 
     GET /                               -> the card-mockup web page (static/)
-    GET /cards/generate?mana_value=4    -> a single generated Card (optional &mayhem=text|full)
+    GET /cards/generate?mana_value=4    -> a single generated Card (optional &mayhem=text|full|unhinged)
     GET /cards/decode?code=...          -> reconstruct a Card from its share_code
     POST /cards/save                    -> persist a share_code, get a short id back
     GET /c/{id}                         -> the Card saved under that short id
@@ -56,8 +56,9 @@ MAYHEM_QUERY = Query(
     "off",
     description="Break mana-value scoping on purpose. 'text' samples rules text/keywords from the whole "
     "(format-filtered) pool instead of just this mana value; 'full' also does that for mana cost, "
-    "power/toughness, and type line, so the card can come back wildly off-curve. 'off' (default) is normal, "
-    "curve-appropriate generation.",
+    "power/toughness, and type line, so the card can come back wildly off-curve; 'unhinged' is 'full' but "
+    "also forces at least one line of rules text instead of leaving that to chance. 'off' (default) is "
+    "normal, curve-appropriate generation.",
 )
 
 

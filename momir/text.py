@@ -465,10 +465,16 @@ def _reroll_line(text: str, pool: SentencePool, vocab: RerollVocab | None, rng: 
 
 
 def generate_rules_text(
-    pool: SentencePool, card_name: str, rng: random.Random | None = None, vocab: RerollVocab | None = None
+    pool: SentencePool,
+    card_name: str,
+    rng: random.Random | None = None,
+    vocab: RerollVocab | None = None,
+    force: bool = False,
 ) -> list[str]:
     rng = rng or random
-    if rng.random() >= EXTRA_TEXT_CHANCE or not pool.shape_counts:
+    if not pool.shape_counts:
+        return []
+    if not force and rng.random() >= EXTRA_TEXT_CHANCE:
         return []
 
     # Pick one shape (trigger / activated / static -- see corpus.py's
@@ -494,4 +500,14 @@ def generate_rules_text(
             sentence = rng.choice(sentences)
         sentence = _reroll_line(sentence, pool, vocab, rng)
         lines.append(sentence.replace("~", card_name))
+
+    # position 0/1 can both come up empty if the chosen shape happens to have
+    # no sentences at that exact position (e.g. it only ever appears as a
+    # card's 2nd+ sentence) -- under force, fall back to any real sentence in
+    # the pool rather than leave the card with no rules text at all.
+    if force and not lines:
+        fallback = [sentence for bucket in pool.sentences.values() for sentence in bucket]
+        if fallback:
+            sentence = _reroll_line(rng.choice(fallback), pool, vocab, rng)
+            lines.append(sentence.replace("~", card_name))
     return lines

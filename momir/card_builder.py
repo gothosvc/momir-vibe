@@ -22,7 +22,7 @@ RARITY_WEIGHTS = {"common": 40, "uncommon": 30, "rare": 20, "mythic": 10}
 MIN_MANA_VALUE = 0
 MAX_MANA_VALUE = 16
 
-Mayhem = Literal["off", "text", "full"]
+Mayhem = Literal["off", "text", "full", "unhinged"]
 
 
 class CardGenerator:
@@ -65,8 +65,9 @@ class CardGenerator:
             )
 
         rng = rng or random
-        full_mayhem = mayhem == "full"
-        text_mayhem = mayhem in ("text", "full")
+        full_mayhem = mayhem in ("full", "unhinged")
+        text_mayhem = mayhem in ("text", "full", "unhinged")
+        force_text = mayhem == "unhinged"
 
         name = generate_name(self.name_chains, rng=rng)
         mana_cost = colors.synthesize_mana_cost(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
@@ -77,7 +78,7 @@ class CardGenerator:
         power, toughness = stats.generate_power_toughness(self.corpus, mana_value, rng=rng, mayhem=full_mayhem)
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
         pool = self.mayhem_sentence_pool if text_mayhem else self.sentence_pools[mana_value]
-        rules_text = text.generate_rules_text(pool, name, rng=rng, vocab=self.reroll_vocab)
+        rules_text = text.generate_rules_text(pool, name, rng=rng, vocab=self.reroll_vocab, force=force_text)
 
         # A real creature's art, matched by color identity -- unrelated to
         # this card's name/text, just a thematically plausible picture. None
