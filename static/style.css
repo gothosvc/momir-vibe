@@ -256,6 +256,14 @@ main {
   color: #14110c;
 }
 
+.pip-inline {
+  width: 0.95em;
+  height: 0.95em;
+  font-size: 0.72em;
+  vertical-align: -0.15em;
+  margin: 0 0.03em;
+}
+
 .pip-w { background: #f8f4e3; }
 .pip-u { background: #6ea3d8; }
 .pip-b { background: #8a7f8a; }

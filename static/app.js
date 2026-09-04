@@ -23,6 +23,26 @@ function renderManaCost(manaCost) {
     .join("");
 }
 
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;" };
+function escapeHtml(str) {
+  return str.replace(/[&<>]/g, (c) => HTML_ESCAPES[c]);
+}
+
+// Renders prose that may contain inline {W}/{2}/{T}-style symbols (keyword
+// costs, activated-ability costs) as the same pip spans used in the mana
+// cost line, so e.g. "Ward {2}" matches the card's cost styling.
+function renderTextWithMana(text) {
+  return text
+    .split(/(\{[^}]+\})/g)
+    .map((part) => {
+      const m = part.match(/^\{([^}]+)\}$/);
+      return m
+        ? `<span class="pip pip-inline ${pipClass(m[1])}">${m[1]}</span>`
+        : escapeHtml(part);
+    })
+    .join("");
+}
+
 // The currently-displayed card, kept around so the save/share buttons don't
 // need to re-fetch or re-derive anything -- see renderCard().
 let currentCard = null;
@@ -65,12 +85,12 @@ function renderCard(card) {
   for (const keyword of card.keywords) {
     const p = document.createElement("p");
     p.className = "keyword-line";
-    p.textContent = keyword;
+    p.innerHTML = renderTextWithMana(keyword);
     textBox.appendChild(p);
   }
   for (const line of card.rules_text) {
     const p = document.createElement("p");
-    p.textContent = line;
+    p.innerHTML = renderTextWithMana(line);
     textBox.appendChild(p);
   }
 
