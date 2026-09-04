@@ -130,6 +130,25 @@ def _keyword_occurrence(oracle_text: str, keyword: str, name: str = "") -> str |
     return None
 
 
+# An ability word's captured "value" is really a clause introduction, not a
+# value -- "Constellation" reads back as " — Whenever this creature or
+# another enchantment you control enters" (see _keyword_occurrence's own
+# docstring on the space-on-both-sides convention), and printing that as a
+# bare Keywords-line entry ("Constellation — Whenever ... enters") produces
+# a clause that's cut off right where the ability word's own comma would
+# continue it. Some ability words carry a numeric parameter before their
+# dash too ("Descend 8 — As long as there are eight or more permanent cards
+# ..."), so leading digits are allowed rather than disqualifying.
+#
+# What actually distinguishes this from a real value: nothing but
+# whitespace/digits sits between the keyword name and the dash. A real
+# value-with-dash prints something concrete there instead -- Prototype's own
+# mana cost ("Prototype {2}{G}{G} — 2/5"), or nothing at all before an
+# alt-cost dash that fuses directly with no space ("Ward—Pay 2 life") --
+# so neither is mistaken for the empty lead-in an ability word always has.
+_ABILITY_WORD_VALUE_RE = re.compile(r"^\s*\d*\s*[—-]\s")
+
+
 def _prune_rare_keywords(corpus: Corpus) -> None:
     totals: Counter = Counter()
     for counter in corpus.keywords_by_cmc.values():
@@ -348,6 +367,74 @@ def has_ungrounded_x(sentence: str, shape: str) -> bool:
     return True
 
 
+# "Choose target X" sets up a choice without saying what happens to it --
+# real oracle text almost always pays that off in a *separate* sentence
+# ("...choose target creature. It gets -3/-3 until end of turn."), which
+# training samples independently by position (see momir/text.py's
+# SentencePool) and isn't guaranteed to travel with the sentence that set it
+# up. Isolated, "choose target artifact card in your graveyard." reads as a
+# choice with no consequence. Grounded only when the same sentence pays it
+# off itself ("choose target creature, then it gets -3/-3."); everything
+# else is presumed to lean on a follow-up sentence this generator can't
+# guarantee, same treatment as has_ungrounded_x above.
+_CHOOSE_TARGET_RE = re.compile(r"\bchoose\b[^.!?]*\btarget\b", re.IGNORECASE)
+_CHOOSE_RESOLVED_RE = re.compile(r"\bthen\b", re.IGNORECASE)
+
+
+def has_dangling_choice(sentence: str) -> bool:
+    """True if `sentence` sets up a "choose target ..." choice that isn't
+    resolved within itself -- see the comment above. A sentence failing this
+    check is excluded from sentences_by_cmc entirely, same as
+    has_ungrounded_x."""
+    match = _CHOOSE_TARGET_RE.search(sentence)
+    if not match:
+        return False
+    return not _CHOOSE_RESOLVED_RE.search(sentence[match.end():])
+
+
+# "This mana" always refers back to a specific "Add ..." mana ability
+# elsewhere on the same card ("{T}: Add {G}. Spend this mana only to cast a
+# creature spell."), always as its own separate sentence -- never inside the
+# same one. No generated card ever prints a matching "Add" line (mana
+# abilities aren't part of what this generator builds), so any sentence
+# referencing "this mana" is unresolvable in isolation, same class of
+# problem as an ungrounded "choose target" above -- dropped unconditionally
+# rather than checked for a same-sentence resolution, since none exists
+# anywhere in the training data.
+_THIS_MANA_RE = re.compile(r"\bthis mana\b", re.IGNORECASE)
+
+
+def has_dangling_mana_reference(sentence: str) -> bool:
+    """True if `sentence` references "this mana" -- see the comment above. A
+    sentence failing this check is excluded from sentences_by_cmc entirely,
+    same as has_ungrounded_x."""
+    return bool(_THIS_MANA_RE.search(sentence))
+
+
+# "Roll a d20"/"roll a six-sided die" is a setup with no effect of its own --
+# the payoff is always either a separate sentence naming "the result"
+# ("Whenever ~ attacks, roll a d20. You create a number of Treasure tokens
+# equal to the result.") or a card-frame threshold table ("1-9 | ...", "20 |
+# ...") that's already dropped as templating (see _is_template_fragment), so
+# either way it's a different real sentence than this one, same unguaranteed
+# pairing problem as an ungrounded "choose target" above. The die type is
+# what marks a roll as this generator's own unresolved setup rather than a
+# reaction to one that already happened elsewhere ("Whenever you roll a 4 or
+# higher, ..." is a complete, self-contained condition on its own).
+_DIE_ROLL_RE = re.compile(
+    r"\broll(?:s|ing)?\b[^.!?]*?\b(?:d\d+|(?:four|six|eight|ten|twelve|twenty|\d+)-sided (?:die|dice))\b",
+    re.IGNORECASE,
+)
+_ROLL_RESULT_RE = re.compile(r"\bthe result\b", re.IGNORECASE)
+
+
+def has_dangling_die_roll(sentence: str) -> bool:
+    """True if `sentence` sets up or pays off a die roll it doesn't itself
+    resolve -- see the comment above. A sentence failing this check is
+    excluded from sentences_by_cmc entirely, same as has_ungrounded_x."""
+    return bool(_DIE_ROLL_RE.search(sentence) or _ROLL_RESULT_RE.search(sentence))
+
+
 def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[str, int, str]]:
     """Returns (sentence, position, shape) triples; see _sentence_shape.
 
@@ -379,15 +466,34 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
             sentence = sentence.strip()
             if not sentence:
                 continue
+            # A chunk with no terminal punctuation isn't a sentence at all --
+            # it's a bare keyword/ability-word header line ("Flying",
+            # "Flying, trample", "Storied" once its own reminder text is
+            # stripped) that real oracle text never ends with a period,
+            # since it's not read as prose. Left untrained, one of these
+            # would surface as a rules-text line duplicating (or standing in
+            # for) the card's own Keywords line -- see momir/text.py's
+            # generate_keywords, a separate, unrelated sampling pass.
+            #
             # Self-quoted sub-abilities ('...has "Whenever this creature
             # attacks, ..."') pair an opening and closing quote that can
             # land in different sentences (or get sentence-split apart
             # entirely) -- word-splicing has no way to keep them balanced,
             # so quoted sentences are dropped rather than left to produce
             # stray dangling quote marks. Sentences with an ungrounded bare
-            # "X" are dropped for the same reason -- see has_ungrounded_x.
+            # "X", a dangling "choose target", a dangling "this mana", or a
+            # dangling die roll are dropped for the same reason -- see
+            # has_ungrounded_x / has_dangling_choice /
+            # has_dangling_mana_reference / has_dangling_die_roll.
             shape = _sentence_shape(sentence)
-            if '"' not in sentence and not has_ungrounded_x(sentence, shape):
+            if (
+                sentence.endswith((".", "!", "?"))
+                and '"' not in sentence
+                and not has_ungrounded_x(sentence, shape)
+                and not has_dangling_choice(sentence)
+                and not has_dangling_mana_reference(sentence)
+                and not has_dangling_die_roll(sentence)
+            ):
                 sentences.append((sentence, position, shape))
             position += 1
     return sentences
@@ -462,7 +568,7 @@ def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = Non
 
         for keyword in card.get("keywords") or []:
             value = _keyword_occurrence(oracle_text, keyword, name or "")
-            if value is None:
+            if value is None or _ABILITY_WORD_VALUE_RE.match(value):
                 continue
             corpus.keywords_by_cmc[cmc][keyword] += 1
             corpus.keyword_values_by_cmc[cmc][keyword].append(value)
