@@ -411,6 +411,27 @@ def has_dangling_mana_reference(sentence: str) -> bool:
     return bool(_THIS_MANA_RE.search(sentence))
 
 
+# "You may pay <cost>" is a setup with no effect of its own -- the payoff is
+# almost always a separate sentence ("If you do, ..." / "When you do, ..." /
+# "If you don't, ..."), same unguaranteed pairing problem as an ungrounded
+# "choose target" above. Real oracle text does occasionally resolve a pay
+# clause within the same sentence, but always via "rather than" (an
+# alternative-cost substitution, never needing a payoff at all) -- so that's
+# the one case exempted here; everything else is presumed to lean on a
+# separate payoff sentence this generator can't guarantee.
+_MAY_PAY_RE = re.compile(r"\byou may pay\b", re.IGNORECASE)
+
+
+def has_dangling_pay(sentence: str) -> bool:
+    """True if `sentence` sets up a "you may pay ..." choice that isn't
+    resolved within itself -- see the comment above. A sentence failing this
+    check is excluded from sentences_by_cmc entirely, same as
+    has_ungrounded_x."""
+    if not _MAY_PAY_RE.search(sentence):
+        return False
+    return "rather than" not in sentence.lower()
+
+
 # "Roll a d20"/"roll a six-sided die" is a setup with no effect of its own --
 # the payoff is always either a separate sentence naming "the result"
 # ("Whenever ~ attacks, roll a d20. You create a number of Treasure tokens
@@ -481,10 +502,11 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
             # entirely) -- word-splicing has no way to keep them balanced,
             # so quoted sentences are dropped rather than left to produce
             # stray dangling quote marks. Sentences with an ungrounded bare
-            # "X", a dangling "choose target", a dangling "this mana", or a
-            # dangling die roll are dropped for the same reason -- see
-            # has_ungrounded_x / has_dangling_choice /
-            # has_dangling_mana_reference / has_dangling_die_roll.
+            # "X", a dangling "choose target", a dangling "this mana", a
+            # dangling die roll, or a dangling "you may pay" are dropped for
+            # the same reason -- see has_ungrounded_x / has_dangling_choice /
+            # has_dangling_mana_reference / has_dangling_die_roll /
+            # has_dangling_pay.
             shape = _sentence_shape(sentence)
             if (
                 sentence.endswith((".", "!", "?"))
@@ -493,6 +515,7 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
                 and not has_dangling_choice(sentence)
                 and not has_dangling_mana_reference(sentence)
                 and not has_dangling_die_roll(sentence)
+                and not has_dangling_pay(sentence)
             ):
                 sentences.append((sentence, position, shape))
             position += 1
