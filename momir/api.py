@@ -56,9 +56,10 @@ MAYHEM_QUERY = Query(
     "off",
     description="Break mana-value scoping on purpose. 'text' samples rules text/keywords from the whole "
     "(format-filtered) pool instead of just this mana value; 'full' also does that for mana cost, "
-    "power/toughness, and type line, so the card can come back wildly off-curve; 'unhinged' is 'full' but "
-    "also forces at least one line of rules text instead of leaving that to chance. 'off' (default) is "
-    "normal, curve-appropriate generation.",
+    "power/toughness, and type line (still favoring nearby mana values), so the card can come back "
+    "off-curve; 'unhinged' is 'full' but with that nearby-mana-value favoring dropped too (every mana "
+    "value equally likely to be sampled from) and at least one line of rules text forced instead of left "
+    "to chance. 'off' (default) is normal, curve-appropriate generation.",
 )
 
 

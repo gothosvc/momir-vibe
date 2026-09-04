@@ -249,15 +249,16 @@ def mana_value_weight(cmc: int, mana_value: int) -> float:
     return 1.0 / (1 + abs(cmc - mana_value))
 
 
-def subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False) -> Counter:
+def subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False, weighted: bool = True) -> Counter:
     """The creature-subtype Counter to draw from -- under mayhem, pooled
-    across every mana value but weighted by distance (see
-    mana_value_weight), else the requested one if it has any, else the
+    across every mana value, weighted by distance (see mana_value_weight)
+    unless `weighted` is False, in which case every cmc bucket contributes
+    its real counts unscaled; else the requested cmc if it has any, else the
     nearest one that does."""
     if mayhem:
         combined: Counter = Counter()
         for cmc, counter in corpus.subtypes_by_cmc.items():
-            weight = mana_value_weight(cmc, mana_value)
+            weight = mana_value_weight(cmc, mana_value) if weighted else 1.0
             for name, count in counter.items():
                 combined[name] += count * weight
         return combined
