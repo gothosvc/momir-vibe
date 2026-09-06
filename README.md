@@ -61,7 +61,7 @@ Serves at `http://127.0.0.1:8000` — a card mockup page in the browser, interac
 - `GET /cards/generate/image?mana_value=4` — the same, as a black & white printable PNG.
 - `GET /health` — liveness + corpus size.
 
-Both generation endpoints take an optional `format` (`standard`/`pioneer`/`modern`, restricts training data to that format's legal pool) and `mayhem` (see above). Full param docs are in `/docs`.
+Both generation endpoints take an optional `format` (`standard`/`pioneer`/`modern`, restricts training data to that format's legal pool), `mayhem` (see above), and `seed` — replays a specific generation instead of a fresh random one; `/cards/generate` hands its seed back in an `X-Momir-Seed` header, which is how the mockup page's "Printable image" button reprints the card actually on screen rather than a new random one, without persisting anything server-side. Full param docs are in `/docs`.
 
 ```bash
 curl "http://127.0.0.1:8000/cards/generate?mana_value=3"

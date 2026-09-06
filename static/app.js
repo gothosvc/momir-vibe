@@ -209,13 +209,18 @@ async function generate(manaValue) {
   }
 
   try {
-    const fetchPromise = fetch(`/cards/generate?${buildParams(manaValue)}`);
+    const { params, format, mayhem } = buildParams(manaValue);
+    const fetchPromise = fetch(`/cards/generate?${params}`);
     const [res] = await Promise.all([fetchPromise, wasVisible ? sleep(STORM_MS) : null]);
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new Error(errorMessage(body, res.status));
     }
     const card = await res.json();
+    // The seed the server used for this card -- stashed so "Printable
+    // image" can later request this *exact* card as an image instead of
+    // yet another random one (see /cards/generate/image's seed param).
+    card._genParams = { mana_value: manaValue, format, mayhem, seed: res.headers.get("X-Momir-Seed") };
     cardEl.classList.remove("storming");
     showCard(card, { animateSettle: wasVisible });
   } catch (err) {
@@ -233,14 +238,12 @@ function selectedManaValue() {
   return document.querySelector(".mv-chip.selected")?.dataset.value ?? "3";
 }
 
-// Shared by generate() and the printable-image link below -- both just
-// hit a different path with the same mana_value/format/mayhem selection.
 function buildParams(manaValue) {
   const mayhem = document.getElementById("mayhem").value;
   const format = document.getElementById("format").value;
   const params = new URLSearchParams({ mana_value: manaValue, mayhem });
   if (format) params.set("format", format);
-  return params;
+  return { params, format, mayhem };
 }
 
 function selectManaValue(value) {
@@ -266,13 +269,18 @@ document.getElementById("controls").addEventListener("submit", (event) => {
   generate(selectedManaValue());
 });
 
-// Opens a *different*, freshly-generated card at the same mana value/format/
-// mayhem selection as a printable image -- there's no way to print the
-// exact card currently on screen, since nothing here has an ID to re-render
-// by (cards are never persisted server-side; see /cards/generate/image's
-// same relationship to /cards/generate as Scryfall's own /cards/random).
+// Reprints the card currently on screen: replays its own stashed seed (see
+// generate() above) rather than generating a new random one, so this is
+// the *same* card, not just another one at the same mana value. Nothing is
+// persisted server-side to make this work -- the seed is the only state,
+// held here in the tab, same as the rest of the session.
 document.getElementById("printable-btn").addEventListener("click", () => {
-  window.open(`/cards/generate/image?${buildParams(selectedManaValue())}`, "_blank");
+  if (!currentCard?._genParams) return;
+  const { mana_value, format, mayhem, seed } = currentCard._genParams;
+  const params = new URLSearchParams({ mana_value, mayhem });
+  if (format) params.set("format", format);
+  if (seed) params.set("seed", seed);
+  window.open(`/cards/generate/image?${params}`, "_blank");
 });
 
 generate(selectedManaValue());
