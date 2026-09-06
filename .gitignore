@@ -2,8 +2,6 @@
 __pycache__/
 *.pyc
 data/cards_cache.json
-data/saved_cards.db
-data/saved_cards.db-*
 .DS_Store
 .claude/settings.local.json
 todo.txt
