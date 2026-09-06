@@ -30,17 +30,3 @@ class Card(BaseModel):
         "thematically plausible picture. None if the corpus has no art data "
         "(cache predates this feature) -- see momir/art.py.",
     )
-    share_code: str | None = Field(
-        None,
-        description="Opaque string encoding this exact card. Feed it back into "
-        "GET /cards/decode to reconstruct this card later, with no regeneration "
-        "involved -- see momir/codec.py.",
-    )
-
-
-class SaveCardRequest(BaseModel):
-    share_code: str = Field(..., description="A card's share_code to persist under a short id.")
-
-
-class SaveCardResponse(BaseModel):
-    id: str = Field(..., description="Short id for this card -- fetch it back via GET /c/{id}.")
