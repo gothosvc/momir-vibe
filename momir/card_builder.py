@@ -88,6 +88,9 @@ class CardGenerator:
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
         pool = self.mayhem_sentence_pool if text_mayhem else self.sentence_pools[mana_value]
         rules_text = text.generate_rules_text(pool, name, rng=rng, vocab=self.reroll_vocab, force=force_text)
+        power_defined, toughness_defined = text.rules_text_defines_pt(rules_text, name)
+        power = "*" if power_defined else power
+        toughness = "*" if toughness_defined else toughness
 
         # A real creature's art, matched by color identity -- unrelated to
         # this card's name/text, just a thematically plausible picture. None

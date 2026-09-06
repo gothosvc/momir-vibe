@@ -464,6 +464,28 @@ def _reroll_line(text: str, pool: SentencePool, vocab: RerollVocab | None, rng: 
     return text
 
 
+def rules_text_defines_pt(rules_text: list[str], card_name: str) -> tuple[bool, bool]:
+    """Whether the generated rules text includes a real "~'s power and/or
+    toughness are each equal to ..." characteristic-defining clause -- if so
+    the printed stat should show "*" instead of the sampled number, same as
+    the real card would (e.g. Tarmogoyf, Adeline, An-Havva Constable).
+    Checked against both the card's own name and "this creature", the two
+    ways real oracle text self-references (see corpus.py's
+    _normalize_self_references)."""
+    subject = f"{re.escape(card_name)}|this creature"
+    pattern = re.compile(
+        rf"(?:{subject})'s (power(?: and toughness)?|toughness(?: and power)?)\s+(?:is|are)\s+(?:each\s+)?equal to",
+        re.IGNORECASE,
+    )
+    power = toughness = False
+    for line in rules_text:
+        for match in pattern.finditer(line):
+            mentioned = match.group(1).lower()
+            power = power or "power" in mentioned
+            toughness = toughness or "toughness" in mentioned
+    return power, toughness
+
+
 def generate_rules_text(
     pool: SentencePool,
     card_name: str,

@@ -13,7 +13,14 @@ import random
 from collections import Counter
 
 from .corpus import Corpus
-from .text import RerollVocab, _extract_number_spans, build_reroll_vocab, build_sentence_pools, generate_rules_text
+from .text import (
+    RerollVocab,
+    _extract_number_spans,
+    build_reroll_vocab,
+    build_sentence_pools,
+    generate_rules_text,
+    rules_text_defines_pt,
+)
 
 CARD_NAME = "Test Creature"
 MANA_VALUE = 3
@@ -124,6 +131,20 @@ def main() -> None:
     for kind, real_values in {**pool.number_pools, "keyword": pool.keyword_refs, "subtype": pool.subtype_refs}.items():
         if len(set(real_values)) > 1:
             assert len(seen_values.get(kind, ())) > 1, f"{kind} never visibly rerolled across 1000 seeds"
+
+    assert rules_text_defines_pt(
+        [f"{CARD_NAME}'s power and toughness are each equal to the number of lands you control."], CARD_NAME
+    ) == (True, True)
+    assert rules_text_defines_pt(["Test Creature's power is equal to the number of creatures you control."], CARD_NAME) == (
+        True,
+        False,
+    )
+    assert rules_text_defines_pt(["An-Havva Constable's toughness is equal to 1 plus the number of Elves."], CARD_NAME) == (
+        False,
+        False,
+    ), "must not fire for a different creature's name"
+    assert rules_text_defines_pt(["This creature's power and toughness are each equal to X."], CARD_NAME) == (True, True)
+    assert rules_text_defines_pt(["Test Creature gets +1/+1 until end of turn."], CARD_NAME) == (False, False)
 
     empty_corpus = Corpus(raw_cards=[])
     empty_vocab = build_reroll_vocab(empty_corpus)
