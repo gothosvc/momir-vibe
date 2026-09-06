@@ -13,7 +13,6 @@ import random
 from typing import Literal
 
 from . import art, colors, stats, text, types
-from .codec import encode_card
 from .corpus import Corpus, get_corpus
 from .models import Card
 from .names import NameChains, build_name_chains, generate_name
@@ -113,9 +112,6 @@ class CardGenerator:
             artist=artist,
             art_url=art_url,
         )
-        # Attach a share code so every generated card is reconstructible from
-        # this response alone -- see momir/codec.py.
-        card.share_code = encode_card(card)
         return card
 
 
