@@ -13,8 +13,8 @@ class Card(BaseModel):
     colors: list[str] = Field(default_factory=list, description="Color letters, e.g. ['R']")
     color_identity: list[str] = Field(default_factory=list)
     type_line: str
-    power: int
-    toughness: int
+    power: int | str = Field(..., description="'*' when rules_text defines it (e.g. \"~'s power is equal to...\")")
+    toughness: int | str = Field(..., description="'*' when rules_text defines it (e.g. \"~'s toughness is equal to...\")")
     keywords: list[str] = Field(default_factory=list)
     rules_text: list[str] = Field(default_factory=list)
     flavor_text: str | None = None
