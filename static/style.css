@@ -191,6 +191,20 @@ main {
   transform: translateY(1px);
 }
 
+/* .controls-secondary .printable-btn (not just .printable-btn) for the same
+   specificity reason as .mv-chips .mv-chip above -- otherwise ".controls
+   button"'s gold fill wins and this reads as a second primary action. */
+.controls-secondary .printable-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.controls-secondary .printable-btn:hover {
+  background: rgba(201, 162, 75, 0.12);
+  filter: none;
+}
+
 .controls button:disabled {
   opacity: 0.6;
   cursor: default;
