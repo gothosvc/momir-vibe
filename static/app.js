@@ -209,11 +209,7 @@ async function generate(manaValue) {
   }
 
   try {
-    const mayhem = document.getElementById("mayhem").value;
-    const format = document.getElementById("format").value;
-    const params = new URLSearchParams({ mana_value: manaValue, mayhem });
-    if (format) params.set("format", format);
-    const fetchPromise = fetch(`/cards/generate?${params}`);
+    const fetchPromise = fetch(`/cards/generate?${buildParams(manaValue)}`);
     const [res] = await Promise.all([fetchPromise, wasVisible ? sleep(STORM_MS) : null]);
     if (!res.ok) {
       const body = await res.json().catch(() => null);
@@ -237,6 +233,16 @@ function selectedManaValue() {
   return document.querySelector(".mv-chip.selected")?.dataset.value ?? "3";
 }
 
+// Shared by generate() and the printable-image link below -- both just
+// hit a different path with the same mana_value/format/mayhem selection.
+function buildParams(manaValue) {
+  const mayhem = document.getElementById("mayhem").value;
+  const format = document.getElementById("format").value;
+  const params = new URLSearchParams({ mana_value: manaValue, mayhem });
+  if (format) params.set("format", format);
+  return params;
+}
+
 function selectManaValue(value) {
   for (const chip of document.querySelectorAll(".mv-chip")) {
     const selected = chip.dataset.value === value;
@@ -258,6 +264,15 @@ document.getElementById("mv-chips").addEventListener("click", (event) => {
 document.getElementById("controls").addEventListener("submit", (event) => {
   event.preventDefault();
   generate(selectedManaValue());
+});
+
+// Opens a *different*, freshly-generated card at the same mana value/format/
+// mayhem selection as a printable image -- there's no way to print the
+// exact card currently on screen, since nothing here has an ID to re-render
+// by (cards are never persisted server-side; see /cards/generate/image's
+// same relationship to /cards/generate as Scryfall's own /cards/random).
+document.getElementById("printable-btn").addEventListener("click", () => {
+  window.open(`/cards/generate/image?${buildParams(selectedManaValue())}`, "_blank");
 });
 
 generate(selectedManaValue());
