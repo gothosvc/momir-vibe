@@ -12,6 +12,12 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
 
+There's also a printable version — a black & white, card-shaped PNG meant for a thermal printer, for the "printer" Momir Vig setups that pull a random card *image* rather than JSON:
+
+<p>
+  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Knight of Valor, a 4-mana blue common Construct Merfolk with an attack-trigger pump ability, rendered as a dithered card-shaped PNG">
+</p>
+
 ## How it works
 
 ### Card names
@@ -86,6 +92,7 @@ Serves at `http://127.0.0.1:8000` — open it in a browser for a small card mock
 
 - `GET /` — the card mockup web page (`static/`).
 - `GET /cards/generate?mana_value=4` — one generated creature card at that mana value (0–16).
+- `GET /cards/generate/image?mana_value=4` — the same, rendered as a black & white, card-shaped PNG (see above) instead of JSON. Same params as `/cards/generate` below; a fresh, independently-generated card each time, same relationship to `/cards/generate` as Scryfall's own `/cards/random` has to its JSON endpoint.
 - `GET /health` — liveness check + how many cards are in the training corpus (overall and per format).
 
 Both generation endpoints also take an optional `format` param (`standard`, `pioneer`, or `modern`) to restrict training data to cards legal in that format, so generated cards feel like they belong to that format's card pool rather than Magic's full 30-year history. Omit it for the full, unrestricted pool.
