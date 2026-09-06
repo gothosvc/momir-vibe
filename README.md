@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Historian of Zhalfir, a 2-mana green/white common Wall Human with a counter-granting trigger referencing Faerie and Dwarf creatures">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Long-Bodied Grey Dog, a 3-mana red/green common Human with Reach, a Channel ability, and two activated abilities">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Disruptor of Currents, a 12-mana green common Mutant Kraken with Haste, Flying, a has-flying reference, and a granted-keywords ability">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Countless Gears Renegade, a 2-mana blue common Scout with an activated ability that pumps attacking Spirits">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Voice of Truth, a 5-mana red mythic Horror with Landcycling and a token-creating trigger on enter-or-attack">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Salt Road Quartermasters, an 11-mana green common Plant Eldrazi with Cumulative upkeep, Defender, a damage-assignment swap, and a life-for-mana cost reducer">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.

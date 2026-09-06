@@ -54,7 +54,9 @@ main {
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
+  justify-content: center;
   gap: 1rem;
   background: #26262c;
   padding: 1rem 1.25rem;
@@ -113,7 +115,9 @@ main {
 /* --- Card frame --- */
 
 .card {
-  width: 340px;
+  --rot: 0deg;
+  width: 100%;
+  max-width: 340px;
   border-radius: 18px;
   padding: 14px;
   border: 3px solid var(--frame-border);
@@ -121,6 +125,55 @@ main {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
   font-family: Georgia, "Times New Roman", serif;
   color: #1b1b1f;
+  transform: rotate(var(--rot));
+  transition: transform 0.25s ease;
+}
+
+/* Generate's "spell-storm" moment: the frame shudders and its colors
+   flicker through the wheel while the new card is fetched, then the new
+   card slams down at a freshly-rolled tilt. --rot is set per-card in JS
+   (renderCard in app.js) so the card doesn't just sit dead flat. */
+.card.storming {
+  animation: storm-shake 460ms ease-in-out, storm-hue 460ms linear;
+}
+
+.card.settling {
+  animation: settle-bounce 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes storm-shake {
+  0%   { transform: rotate(var(--rot)); }
+  15%  { transform: rotate(calc(var(--rot) - 7deg)) translate(-5px, 3px); }
+  30%  { transform: rotate(calc(var(--rot) + 9deg)) translate(5px, -3px); }
+  45%  { transform: rotate(calc(var(--rot) - 6deg)) translate(-4px, -2px); }
+  60%  { transform: rotate(calc(var(--rot) + 5deg)) translate(4px, 2px); }
+  75%  { transform: rotate(calc(var(--rot) - 3deg)) translate(-2px, 1px); }
+  100% { transform: rotate(var(--rot)); }
+}
+
+@keyframes storm-hue {
+  0%   { filter: hue-rotate(0deg) saturate(1); }
+  20%  { filter: hue-rotate(80deg) saturate(2); }
+  40%  { filter: hue-rotate(150deg) saturate(2.4); }
+  60%  { filter: hue-rotate(230deg) saturate(2); }
+  80%  { filter: hue-rotate(300deg) saturate(1.6); }
+  100% { filter: hue-rotate(360deg) saturate(1); }
+}
+
+@keyframes settle-bounce {
+  0%   { transform: rotate(var(--rot)) scale(1.12); }
+  55%  { transform: rotate(var(--rot)) scale(0.96); }
+  100% { transform: rotate(var(--rot)) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card.storming,
+  .card.settling {
+    animation: none;
+  }
 }
 
 .card-header {
