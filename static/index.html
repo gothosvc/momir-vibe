@@ -4,13 +4,46 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Momir Vibe</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Metamorphous&display=swap" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header class="page-header">
-    <h1>Momir Vibe</h1>
-    <p class="subtitle">Fake creature cards for Momir-style play. Nothing here is a real Magic card.</p>
-  </header>
+  <a class="gh-link" href="https://github.com/gothosvc/momir-vibe" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.757-1.333-1.757-1.089-.745.084-.729.084-.729 1.205.084 1.84 1.236 1.84 1.236 1.07 1.835 2.807 1.305 3.492.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.123-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.653 1.653.24 2.873.12 3.176.77.84 1.233 1.91 1.233 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.694.825.576 4.765-1.588 8.2-6.085 8.2-11.385 0-6.627-5.373-12-12-12z" />
+    </svg>
+  </a>
+
+  <div class="wordmark" role="img" aria-label="Momir Vibe">
+    <svg viewBox="0 0 640 170" class="wordmark-svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="glowGrad" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stop-color="#c9a24b" stop-opacity="0.55" />
+          <stop offset="100%" stop-color="#c9a24b" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#f8f4e3" />
+          <stop offset="100%" stop-color="#c9a24b" />
+        </linearGradient>
+        <filter id="glowBlur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="10" />
+        </filter>
+      </defs>
+
+      <ellipse cx="320" cy="82" rx="260" ry="66" fill="url(#glowGrad)" filter="url(#glowBlur)" />
+
+      <circle cx="70" cy="46" r="7" fill="#f0b79c" stroke="#14110c" stroke-width="1" opacity="0.85" />
+      <circle cx="112" cy="122" r="5" fill="#8fbf8f" stroke="#14110c" stroke-width="1" opacity="0.7" />
+      <circle cx="560" cy="50" r="6" fill="#6ea3d8" stroke="#14110c" stroke-width="1" opacity="0.8" />
+      <circle cx="522" cy="128" r="5" fill="#8a7f8a" stroke="#14110c" stroke-width="1" opacity="0.65" />
+      <circle cx="600" cy="100" r="4" fill="#f8f4e3" stroke="#14110c" stroke-width="1" opacity="0.6" />
+      <circle cx="42" cy="94" r="4" fill="#d8d2c2" stroke="#14110c" stroke-width="1" opacity="0.55" />
+
+      <text x="322" y="112" text-anchor="middle" font-family="Metamorphous, Georgia, 'Times New Roman', serif" font-size="66" fill="#c1502f" opacity="0.3" style="mix-blend-mode: screen">Momir Vibe</text>
+      <text x="318" y="108" text-anchor="middle" font-family="Metamorphous, Georgia, 'Times New Roman', serif" font-size="66" fill="#4f7fb3" opacity="0.3" style="mix-blend-mode: screen">Momir Vibe</text>
+      <text x="320" y="110" text-anchor="middle" font-family="Metamorphous, Georgia, 'Times New Roman', serif" font-size="66" fill="url(#goldGrad)" stroke="#14110c" stroke-width="1" style="letter-spacing: 2px">Momir Vibe</text>
+    </svg>
+  </div>
 
   <main>
     <form id="controls" class="controls">

@@ -18,6 +18,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  position: relative;
   background: var(--page-bg);
   color: var(--page-fg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -27,21 +28,38 @@ body {
   padding: 2.5rem 1rem 4rem;
 }
 
-.page-header {
-  text-align: center;
-  margin-bottom: 1.75rem;
-}
-
-.page-header h1 {
-  margin: 0 0 0.35rem;
-  font-size: 2rem;
-  letter-spacing: 0.02em;
-}
-
-.subtitle {
-  margin: 0;
+.gh-link {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
   color: var(--muted);
-  font-size: 0.95rem;
+}
+.gh-link:hover {
+  color: var(--page-fg);
+  background: rgba(255, 255, 255, 0.06);
+}
+.gh-link svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wordmark {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.wordmark-svg {
+  width: min(90vw, 420px);
+  height: auto;
+  display: block;
 }
 
 main {
@@ -73,13 +91,20 @@ main {
 
 .controls input,
 .controls select {
-  width: 5rem;
   padding: 0.45rem 0.5rem;
   border-radius: 6px;
   border: 1px solid #454550;
   background: #1b1b1f;
   color: var(--page-fg);
   font-size: 1rem;
+}
+
+.controls input {
+  width: 5rem;
+}
+
+.controls select {
+  width: 7.5rem;
 }
 
 .controls button {
