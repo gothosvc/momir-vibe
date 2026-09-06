@@ -43,9 +43,14 @@ function renderTextWithMana(text) {
     .join("");
 }
 
-function renderCard(card) {
+function renderCard(card, { animateSettle = false } = {}) {
   const el = document.getElementById("card");
   el.className = `card ${frameClass(card.colors)}`;
+  // Every card lands at a slight random tilt, like it was just slapped
+  // onto the table -- animateSettle (only set by a fresh Generate, see
+  // generate() below) additionally plays the settle-bounce animation.
+  el.style.setProperty("--rot", `${(Math.random() * 6 - 3).toFixed(1)}deg`);
+  if (animateSettle) el.classList.add("settling");
 
   document.getElementById("card-name").textContent = card.name;
   document.getElementById("card-mana").innerHTML = renderManaCost(card.mana_cost);
@@ -111,22 +116,44 @@ function errorMessage(body, status) {
   return `Request failed (${status})`;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Matches the .storming animation duration in style.css -- keeping the
+// storm on screen for at least this long even when the request comes back
+// instantly is what makes it read as a moment rather than a glitch.
+const STORM_MS = 460;
+
 async function generate(manaValue) {
   const errorEl = document.getElementById("error");
   const button = document.getElementById("generate-btn");
+  const cardEl = document.getElementById("card");
   errorEl.hidden = true;
   button.disabled = true;
+
+  // Only play the storm when there's already a card in place to storm --
+  // the very first card on page load just appears.
+  const wasVisible = !cardEl.hidden;
+  if (wasVisible) {
+    cardEl.classList.remove("settling");
+    cardEl.classList.add("storming");
+  }
+
   try {
     const mayhem = document.getElementById("mayhem").value;
-    const res = await fetch(
-      `/cards/generate?mana_value=${encodeURIComponent(manaValue)}&mayhem=${encodeURIComponent(mayhem)}`
-    );
+    const format = document.getElementById("format").value;
+    const params = new URLSearchParams({ mana_value: manaValue, mayhem });
+    if (format) params.set("format", format);
+    const fetchPromise = fetch(`/cards/generate?${params}`);
+    const [res] = await Promise.all([fetchPromise, wasVisible ? sleep(STORM_MS) : null]);
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new Error(errorMessage(body, res.status));
     }
-    renderCard(await res.json());
+    const card = await res.json();
+    cardEl.classList.remove("storming");
+    renderCard(card, { animateSettle: wasVisible });
   } catch (err) {
+    cardEl.classList.remove("storming");
     errorEl.textContent = err.message || "Something went wrong.";
     errorEl.hidden = false;
   } finally {
