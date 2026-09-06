@@ -246,8 +246,9 @@ main {
 
 .card.stack-card {
   /* Each nth-last-child rule below only sets these -- the shared transform
-     underneath composes them, so hover/focus can add --lift on top of
-     whatever depth a card is fanned to instead of fighting it. */
+     underneath composes them, so a container hover (bigger --ty, see the
+     "spread" rules below) and a single card's own --lift never fight each
+     other, they just add up. */
   --tx: 0px;
   --ty: 0px;
   --trot: 0deg;
@@ -259,7 +260,7 @@ main {
   height: auto;
   cursor: pointer;
   transform: translate(var(--tx), calc(var(--ty) + var(--lift))) rotate(var(--trot)) scale(var(--tscale));
-  transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease, filter 0.2s ease;
 }
 
 .card.stack-card:hover,
@@ -275,14 +276,34 @@ main {
   opacity: 0.6;
 }
 
-/* Counting from the *last* stacked child (not the first) is what makes
-   this work regardless of how many cards are currently stacked -- the most
-   recently displaced card is always nth-last-child(1), closest to the live
-   card on top of it. */
-.card.stack-card:nth-last-child(1) { --tx: 24px; --ty: 32px; --trot: -5deg; --tscale: 0.95; opacity: 0.9; }
-.card.stack-card:nth-last-child(2) { --tx: 44px; --ty: 58px; --trot: 6deg; --tscale: 0.9; opacity: 0.75; }
-.card.stack-card:nth-last-child(3) { --tx: -30px; --ty: 76px; --trot: -7deg; --tscale: 0.85; opacity: 0.6; }
-.card.stack-card:nth-last-child(4) { --tx: 50px; --ty: 92px; --trot: 7deg; --tscale: 0.8; opacity: 0.45; }
+/* Tucked fan: mostly vertical offset (small --tx) rather than diagonal, so
+   the sliver of each card that peeks out is a forgiving band, not a small
+   corner wedge that needs precise aim on both axes. --ty is chosen so each
+   card's bottom edge clears the one in front of it (which is *less*
+   scaled-down, so it isn't shrinking as fast as it's stepping down) by a
+   real ~28px margin -- not just "a bigger number than last time" -- so
+   every depth gets an actually-exposed band, not just the first one. */
+.card.stack-card:nth-last-child(1) { --tx: 12px; --ty: 45px; --trot: -3deg; --tscale: 0.97; opacity: 0.9; }
+.card.stack-card:nth-last-child(2) { --tx: -16px; --ty: 90px; --trot: 4deg; --tscale: 0.94; opacity: 0.75; }
+.card.stack-card:nth-last-child(3) { --tx: 18px; --ty: 135px; --trot: -4deg; --tscale: 0.91; opacity: 0.6; }
+.card.stack-card:nth-last-child(4) { --tx: -20px; --ty: 180px; --trot: 4deg; --tscale: 0.88; opacity: 0.45; }
+
+/* Spread: hovering (or tabbing into) the stack at all fans every card out
+   further before the user has aimed at any one of them specifically -- the
+   tucked band above is already enough to land this first hover, and from
+   there the wider clearance (~55px between bottoms, same reasoning as the
+   tucked state) makes the next click easy. Higher specificity than the
+   tucked rules above (four classes vs. three) so it overrides them with no
+   !important needed. Only --ty changes -- --tx/--trot/--tscale keep
+   cascading in from the tucked rule above. */
+.card-stack:hover .stack-card:nth-last-child(1),
+.card-stack:focus-within .stack-card:nth-last-child(1) { --ty: 70px; }
+.card-stack:hover .stack-card:nth-last-child(2),
+.card-stack:focus-within .stack-card:nth-last-child(2) { --ty: 140px; }
+.card-stack:hover .stack-card:nth-last-child(3),
+.card-stack:focus-within .stack-card:nth-last-child(3) { --ty: 210px; }
+.card-stack:hover .stack-card:nth-last-child(4),
+.card-stack:focus-within .stack-card:nth-last-child(4) { --ty: 280px; }
 
 /* Generate's "spell-storm" moment: the frame shudders and its colors
    flicker through the wheel while the new card is fetched, then the new
