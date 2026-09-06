@@ -3,6 +3,7 @@ The local API server.
 
     GET /                               -> the card-mockup web page (static/)
     GET /cards/generate?mana_value=4    -> a single generated Card (optional &mayhem=text|full|unhinged)
+    GET /cards/generate/image?mana_value=4  -> the same, rendered as a B&W PNG for thermal-printed proxies
     GET /health                         -> liveness check
     GET /docs                           -> interactive API docs (Swagger UI)
 
@@ -13,9 +14,10 @@ from __future__ import annotations
 import pathlib
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.staticfiles import StaticFiles
 
+from . import render
 from .card_builder import MAX_MANA_VALUE, MIN_MANA_VALUE, Mayhem, get_generator
 from .corpus import SUPPORTED_FORMATS, get_corpus
 from .models import Card
@@ -75,6 +77,22 @@ def generate_card(
         return get_generator(format).generate(mana_value, mayhem=mayhem)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/cards/generate/image")
+def generate_card_image(
+    mana_value: int = MANA_VALUE_QUERY, format: Format | None = FORMAT_QUERY, mayhem: Mayhem = MAYHEM_QUERY
+) -> Response:
+    """A freshly-generated card (same relationship to /cards/generate as
+    Scryfall's own /cards/random -- not a way to re-fetch a specific card
+    seen before) rendered as a B&W, card-shaped PNG for a thermal printer
+    that expects to pull a card *image* rather than JSON. Rendered straight
+    into memory (see render.py) -- nothing is ever written to disk."""
+    try:
+        card = get_generator(format).generate(mana_value, mayhem=mayhem)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return Response(content=render.render_card_png(card), media_type="image/png")
 
 
 # Mounted last and at "/" so it only ever catches requests the routes above
