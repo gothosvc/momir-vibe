@@ -12,6 +12,7 @@ Run with:  python -m momir.main   (see main.py)
 from __future__ import annotations
 
 import pathlib
+import random
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Response
@@ -57,6 +58,22 @@ MAYHEM_QUERY = Query(
     "value equally likely to be sampled from) and at least one line of rules text forced instead of left "
     "to chance. 'off' (default) is normal, curve-appropriate generation.",
 )
+SEED_QUERY = Query(
+    None,
+    description="Replay a specific generation instead of a fresh random one -- every card generated from "
+    "the same (seed, mana_value, format, mayhem) is identical (down to art/keywords/rules text), as long "
+    "as the corpus hasn't changed since (a server restart or re-fetch can invalidate this). Omit for a "
+    "fresh random card; GET /cards/generate returns the seed it used in the X-Momir-Seed response header "
+    "so a caller can request the exact same card again, e.g. as a printable image.",
+)
+
+
+def _new_rng(seed: int | None) -> tuple[random.Random, int]:
+    """(rng, seed) -- picks a fresh random seed if none was given, so the
+    caller always has one to hand back to the client even for an ordinary
+    (non-replayed) request."""
+    seed = seed if seed is not None else random.getrandbits(64)
+    return random.Random(seed), seed
 
 
 @app.get("/health")
@@ -71,25 +88,39 @@ def health() -> dict:
 
 @app.get("/cards/generate", response_model=Card)
 def generate_card(
-    mana_value: int = MANA_VALUE_QUERY, format: Format | None = FORMAT_QUERY, mayhem: Mayhem = MAYHEM_QUERY
+    response: Response,
+    mana_value: int = MANA_VALUE_QUERY,
+    format: Format | None = FORMAT_QUERY,
+    mayhem: Mayhem = MAYHEM_QUERY,
+    seed: int | None = SEED_QUERY,
 ) -> Card:
+    rng, seed = _new_rng(seed)
     try:
-        return get_generator(format).generate(mana_value, mayhem=mayhem)
+        card = get_generator(format).generate(mana_value, rng=rng, mayhem=mayhem)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["X-Momir-Seed"] = str(seed)
+    return card
 
 
 @app.get("/cards/generate/image")
 def generate_card_image(
-    mana_value: int = MANA_VALUE_QUERY, format: Format | None = FORMAT_QUERY, mayhem: Mayhem = MAYHEM_QUERY
+    mana_value: int = MANA_VALUE_QUERY,
+    format: Format | None = FORMAT_QUERY,
+    mayhem: Mayhem = MAYHEM_QUERY,
+    seed: int | None = SEED_QUERY,
 ) -> Response:
-    """A freshly-generated card (same relationship to /cards/generate as
-    Scryfall's own /cards/random -- not a way to re-fetch a specific card
-    seen before) rendered as a B&W, card-shaped PNG for a thermal printer
-    that expects to pull a card *image* rather than JSON. Rendered straight
+    """A rendered B&W, card-shaped PNG for a thermal printer that expects
+    to pull a card *image* rather than JSON. Without a seed, a fresh
+    random card each time (same relationship to /cards/generate as
+    Scryfall's own /cards/random); with one, an exact replay of a specific
+    card seen before (see SEED_QUERY) -- e.g. the mockup page's "Printable
+    image" button passing back the seed /cards/generate just handed it, to
+    print the same card rather than a new random one. Rendered straight
     into memory (see render.py) -- nothing is ever written to disk."""
+    rng, seed = _new_rng(seed)
     try:
-        card = get_generator(format).generate(mana_value, mayhem=mayhem)
+        card = get_generator(format).generate(mana_value, rng=rng, mayhem=mayhem)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return Response(content=render.render_card_png(card), media_type="image/png")

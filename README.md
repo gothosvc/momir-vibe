@@ -12,7 +12,7 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
 
-There's also a printable version — a black & white, card-shaped PNG meant for a thermal printer, for "printer" Momir Vig setups that pull a random card *image* rather than JSON:
+There's also a black & white, card-shaped PNG meant for "printer" Momir Vig setups that pull a random card *image* rather than JSON:
 
 <p>
   <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Knight of Valor, a 4-mana blue common Construct Merfolk with an attack-trigger pump ability, rendered as a dithered card-shaped PNG">
@@ -61,7 +61,7 @@ Serves at `http://127.0.0.1:8000` — a card mockup page in the browser, interac
 - `GET /cards/generate/image?mana_value=4` — the same, as a black & white printable PNG.
 - `GET /health` — liveness + corpus size.
 
-Both generation endpoints take an optional `format` (`standard`/`pioneer`/`modern`, restricts training data to that format's legal pool) and `mayhem` (see above). Full param docs are in `/docs`.
+Both generation endpoints take an optional `format` (`standard`/`pioneer`/`modern`, restricts training data to that format's legal pool), `mayhem` (see above), and `seed` — replays a specific generation instead of a fresh random one; `/cards/generate` hands its seed back in an `X-Momir-Seed` header, which is how the mockup page's "Printable image" button reprints the card actually on screen rather than a new random one, without persisting anything server-side. Full param docs are in `/docs`.
 
 ```bash
 curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
@@ -101,4 +101,3 @@ static/                 card mockup web page (vanilla HTML/CSS/JS, no build step
 
 - Generated rules text is flavorful, not mechanically enforced — this is a card *generator*, not a game engine.
 - A Standard-scoped corpus (`format=standard`) goes stale as sets rotate; re-run `data/fetch_cards` occasionally if you use it. Modern/Pioneer don't have this problem.
-- A `data/cards_cache.json` fetched before art support existed has no art data; cards fall back to a plain placeholder until you re-run the fetch.
