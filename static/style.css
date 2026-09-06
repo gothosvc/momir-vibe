@@ -73,12 +73,19 @@ main {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.25rem;
   background: #26262c;
   padding: 1rem 1.25rem;
   border-radius: 10px;
+}
+
+.controls-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
 }
 
 .controls label {
@@ -105,12 +112,6 @@ main {
 
 .controls select {
   width: 7.5rem;
-}
-
-.checkbox-label {
-  flex-direction: row !important;
-  align-items: center;
-  gap: 0.4rem !important;
 }
 
 .mv-picker {
@@ -142,6 +143,7 @@ main {
   font-size: 0.85rem;
   font-weight: 400;
   cursor: pointer;
+  transition: transform 0.1s ease;
 }
 
 .mv-chips .mv-chip:hover {
@@ -160,6 +162,15 @@ main {
   font-weight: 700;
 }
 
+.mv-chips .mv-chip:active {
+  transform: scale(0.9);
+}
+
+.mv-chips.busy {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .controls button {
   padding: 0.55rem 1.25rem;
   border-radius: 6px;
@@ -173,6 +184,11 @@ main {
 
 .controls button:hover {
   filter: brightness(1.08);
+}
+
+.controls button:active:not(:disabled) {
+  filter: brightness(0.94);
+  transform: translateY(1px);
 }
 
 .controls button:disabled {
@@ -229,29 +245,44 @@ main {
 }
 
 .card.stack-card {
+  /* Each nth-last-child rule below only sets these -- the shared transform
+     underneath composes them, so hover/focus can add --lift on top of
+     whatever depth a card is fanned to instead of fighting it. */
+  --tx: 0px;
+  --ty: 0px;
+  --trot: 0deg;
+  --tscale: 1;
+  --lift: 0px;
   position: absolute;
   inset: 0;
   aspect-ratio: 63 / 88;
   height: auto;
   cursor: pointer;
+  transform: translate(var(--tx), calc(var(--ty) + var(--lift))) rotate(var(--trot)) scale(var(--tscale));
   transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
 }
 
 .card.stack-card:hover,
 .card.stack-card:focus-visible {
+  --lift: -10px;
   opacity: 1 !important;
-  filter: brightness(1.08);
+  filter: brightness(1.1);
   outline: none;
+}
+
+.card-stack.busy {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
 /* Counting from the *last* stacked child (not the first) is what makes
    this work regardless of how many cards are currently stacked -- the most
    recently displaced card is always nth-last-child(1), closest to the live
    card on top of it. */
-.card.stack-card:nth-last-child(1) { transform: translate(24px, 32px) rotate(-5deg) scale(0.95); opacity: 0.9; }
-.card.stack-card:nth-last-child(2) { transform: translate(44px, 58px) rotate(6deg) scale(0.9); opacity: 0.75; }
-.card.stack-card:nth-last-child(3) { transform: translate(-30px, 76px) rotate(-7deg) scale(0.85); opacity: 0.6; }
-.card.stack-card:nth-last-child(4) { transform: translate(50px, 92px) rotate(7deg) scale(0.8); opacity: 0.45; }
+.card.stack-card:nth-last-child(1) { --tx: 24px; --ty: 32px; --trot: -5deg; --tscale: 0.95; opacity: 0.9; }
+.card.stack-card:nth-last-child(2) { --tx: 44px; --ty: 58px; --trot: 6deg; --tscale: 0.9; opacity: 0.75; }
+.card.stack-card:nth-last-child(3) { --tx: -30px; --ty: 76px; --trot: -7deg; --tscale: 0.85; opacity: 0.6; }
+.card.stack-card:nth-last-child(4) { --tx: 50px; --ty: 92px; --trot: 7deg; --tscale: 0.8; opacity: 0.45; }
 
 /* Generate's "spell-storm" moment: the frame shudders and its colors
    flicker through the wheel while the new card is fetched, then the new
@@ -291,7 +322,9 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card {
+  .card,
+  .card.stack-card,
+  .mv-chips .mv-chip {
     transition: none;
   }
   .card.storming,
@@ -479,47 +512,3 @@ main {
 .card.green   { --frame-a: #b6d9ae; --frame-b: #4c7a45; }
 .card.gold    { --frame-a: #f1dfa0; --frame-b: #c9a24b; }
 .card.colorless { --frame-a: #d6d3ca; --frame-b: #9a978f; }
-
-/* Extended art: the art crop becomes the whole card's background instead of
-   a boxed-off crop, with the header/type/text/meta panels turned
-   translucent so it shows through behind them. Same markup and DOM order
-   as the normal frame -- only positioning and color change. */
-.card.extended .card-art {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  border: none;
-  border-radius: 0;
-  aspect-ratio: unset;
-  height: 100%;
-  z-index: 0;
-}
-
-.card.extended .card-header,
-.card.extended .card-type,
-.card.extended .card-text-box,
-.card.extended .card-meta {
-  position: relative;
-  z-index: 1;
-}
-
-.card.extended .card-header,
-.card.extended .card-type {
-  background: rgba(20, 17, 12, 0.55);
-  color: #f4f0e6;
-  backdrop-filter: blur(2px);
-}
-
-.card.extended .card-text-box {
-  background: rgba(20, 17, 12, 0.72);
-  color: #f4f0e6;
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.card.extended .card-meta {
-  color: rgba(244, 240, 230, 0.85);
-}
-
-.card.extended .card-art-label {
-  color: rgba(244, 240, 230, 0.6);
-}

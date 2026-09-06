@@ -43,24 +43,13 @@ function renderTextWithMana(text) {
     .join("");
 }
 
-// Whether generated cards render with the full-bleed "extended art" frame
-// (see style.css's .card.extended) -- a global display preference, not a
-// per-card one, so it applies to the live card and every stacked one alike.
-let extendedArt = false;
-
 // Fills in a card element (the live #card, or a cloned #stack-card-template
 // instance) from a Card object -- both share the same inner markup (see
 // index.html), scoped by class rather than id since a stack can hold
 // several of these at once.
 function populateCard(root, card, extraClass = "") {
   const isLegendary = card.type_line.includes("Legendary");
-  root.className = [
-    "card",
-    frameClass(card.colors),
-    extraClass,
-    isLegendary ? "legendary" : "",
-    extendedArt ? "extended" : "",
-  ]
+  root.className = ["card", frameClass(card.colors), extraClass, isLegendary ? "legendary" : ""]
     .filter(Boolean)
     .join(" ");
 
@@ -201,8 +190,15 @@ async function generate(manaValue) {
   const errorEl = document.getElementById("error");
   const button = document.getElementById("generate-btn");
   const cardEl = document.getElementById("card");
+  const chipsEl = document.getElementById("mv-chips");
+  const stackEl = document.getElementById("card-stack");
   errorEl.hidden = true;
+  // Locked for the duration of the request -- a chip click or stack-card
+  // promote mid-fetch would race the response that's already in flight and
+  // land in an inconsistent state (which card is "current" first?).
   button.disabled = true;
+  chipsEl.classList.add("busy");
+  stackEl.classList.add("busy");
 
   // Only play the storm when there's already a card in place to storm --
   // the very first card on page load just appears.
@@ -232,6 +228,8 @@ async function generate(manaValue) {
     errorEl.hidden = false;
   } finally {
     button.disabled = false;
+    chipsEl.classList.remove("busy");
+    stackEl.classList.remove("busy");
   }
 }
 
@@ -260,12 +258,6 @@ document.getElementById("mv-chips").addEventListener("click", (event) => {
 document.getElementById("controls").addEventListener("submit", (event) => {
   event.preventDefault();
   generate(selectedManaValue());
-});
-
-document.getElementById("extended-art").addEventListener("change", (event) => {
-  extendedArt = event.target.checked;
-  if (currentCard) populateCard(document.getElementById("card"), currentCard);
-  renderStack();
 });
 
 generate(selectedManaValue());
