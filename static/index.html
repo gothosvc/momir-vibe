@@ -47,50 +47,92 @@
 
   <main>
     <form id="controls" class="controls">
-      <label for="mana-value">
-        Mana value
-        <input type="number" id="mana-value" name="mana-value" min="0" max="16" value="3" required />
-      </label>
-      <label for="format">
-        Format
-        <select id="format" name="format">
-          <option value="" selected>All</option>
-          <option value="standard">Standard</option>
-          <option value="pioneer">Pioneer</option>
-          <option value="modern">Modern</option>
-        </select>
-      </label>
-      <label for="mayhem">
-        Mayhem
-        <select id="mayhem" name="mayhem">
-          <option value="off" selected>Off</option>
-          <option value="text">Text</option>
-          <option value="full">Full</option>
-          <option value="unhinged">Unhinged</option>
-        </select>
-      </label>
-      <button type="submit" id="generate-btn">Generate</button>
+      <div class="mv-picker" role="group" aria-label="Mana value">
+        <span class="mv-label">Mana value</span>
+        <div class="mv-chips" id="mv-chips">
+          <button type="button" class="mv-chip" data-value="0" aria-pressed="false">0</button>
+          <button type="button" class="mv-chip" data-value="1" aria-pressed="false">1</button>
+          <button type="button" class="mv-chip" data-value="2" aria-pressed="false">2</button>
+          <button type="button" class="mv-chip selected" data-value="3" aria-pressed="true">3</button>
+          <button type="button" class="mv-chip" data-value="4" aria-pressed="false">4</button>
+          <button type="button" class="mv-chip" data-value="5" aria-pressed="false">5</button>
+          <button type="button" class="mv-chip" data-value="6" aria-pressed="false">6</button>
+          <button type="button" class="mv-chip" data-value="7" aria-pressed="false">7</button>
+          <button type="button" class="mv-chip" data-value="8" aria-pressed="false">8</button>
+          <button type="button" class="mv-chip" data-value="9" aria-pressed="false">9</button>
+          <button type="button" class="mv-chip" data-value="10" aria-pressed="false">10</button>
+          <button type="button" class="mv-chip" data-value="11" aria-pressed="false">11</button>
+          <button type="button" class="mv-chip" data-value="12" aria-pressed="false">12</button>
+          <button type="button" class="mv-chip" data-value="13" aria-pressed="false">13</button>
+          <button type="button" class="mv-chip" data-value="14" aria-pressed="false">14</button>
+          <button type="button" class="mv-chip" data-value="15" aria-pressed="false">15</button>
+          <button type="button" class="mv-chip" data-value="16" aria-pressed="false">16</button>
+        </div>
+      </div>
+      <div class="controls-secondary">
+        <label for="format">
+          Format
+          <select id="format" name="format">
+            <option value="" selected>All</option>
+            <option value="standard">Standard</option>
+            <option value="pioneer">Pioneer</option>
+            <option value="modern">Modern</option>
+          </select>
+        </label>
+        <label for="mayhem">
+          Mayhem
+          <select id="mayhem" name="mayhem">
+            <option value="off" selected>Off</option>
+            <option value="text">Text</option>
+            <option value="full">Full</option>
+            <option value="unhinged">Unhinged</option>
+          </select>
+        </label>
+        <button type="submit" id="generate-btn">Generate</button>
+      </div>
     </form>
 
     <p id="error" class="error" hidden></p>
 
-    <div id="card" class="card colorless" hidden>
-      <div class="card-header">
-        <span id="card-name" class="card-name"></span>
-        <span id="card-mana" class="card-mana"></span>
+    <div id="card-scene" class="card-scene">
+      <div id="card-stack" class="card-stack"></div>
+      <div id="card" class="card colorless" hidden>
+        <div class="card-header">
+          <span class="card-name"></span>
+          <span class="card-mana"></span>
+        </div>
+        <div class="card-art" aria-hidden="true">
+          <img class="card-art-image" alt="" hidden />
+          <span class="card-art-label">Momir Vibe</span>
+        </div>
+        <div class="card-type"></div>
+        <div class="card-text-box">
+          <div class="card-text"></div>
+          <div class="card-pt"></div>
+        </div>
+        <div class="card-meta"></div>
       </div>
-      <div id="card-art" class="card-art" aria-hidden="true">
-        <img id="card-art-image" class="card-art-image" alt="" hidden />
-        <span id="card-art-label" class="card-art-label">Momir Vibe</span>
-      </div>
-      <div id="card-type" class="card-type"></div>
-      <div class="card-text-box">
-        <div id="card-text" class="card-text"></div>
-        <div id="card-pt" class="card-pt"></div>
-      </div>
-      <div id="card-meta" class="card-meta"></div>
     </div>
   </main>
+
+  <template id="stack-card-template">
+    <div class="card stack-card">
+      <div class="card-header">
+        <span class="card-name"></span>
+        <span class="card-mana"></span>
+      </div>
+      <div class="card-art" aria-hidden="true">
+        <img class="card-art-image" alt="" hidden />
+        <span class="card-art-label">Momir Vibe</span>
+      </div>
+      <div class="card-type"></div>
+      <div class="card-text-box">
+        <div class="card-text"></div>
+        <div class="card-pt"></div>
+      </div>
+      <div class="card-meta"></div>
+    </div>
+  </template>
 
   <script src="/app.js"></script>
 </body>

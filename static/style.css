@@ -73,12 +73,19 @@ main {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.25rem;
   background: #26262c;
   padding: 1rem 1.25rem;
   border-radius: 10px;
+}
+
+.controls-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
 }
 
 .controls label {
@@ -107,6 +114,63 @@ main {
   width: 7.5rem;
 }
 
+.mv-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.mv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 230px;
+}
+
+/* .mv-chips .mv-chip (not just .mv-chip) so this outweighs the generic
+   ".controls button" gold-fill rule above -- these buttons live inside
+   .controls too, and a bare-class selector loses that specificity fight. */
+.mv-chips .mv-chip {
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid #454550;
+  background: #1b1b1f;
+  color: var(--page-fg);
+  font-size: 0.85rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.mv-chips .mv-chip:hover {
+  border-color: var(--accent);
+}
+
+.mv-chips .mv-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mv-chips .mv-chip.selected {
+  background: var(--accent);
+  color: #1b1b1f;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.mv-chips .mv-chip:active {
+  transform: scale(0.9);
+}
+
+.mv-chips.busy {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .controls button {
   padding: 0.55rem 1.25rem;
   border-radius: 6px;
@@ -120,6 +184,11 @@ main {
 
 .controls button:hover {
   filter: brightness(1.08);
+}
+
+.controls button:active:not(:disabled) {
+  filter: brightness(0.94);
+  transform: translateY(1px);
 }
 
 .controls button:disabled {
@@ -139,10 +208,21 @@ main {
 
 /* --- Card frame --- */
 
-.card {
-  --rot: 0deg;
+/* Sizing/positioning root for the live card plus its history stack (see
+   .card-stack below) -- both are laid out relative to this, not to each
+   other, so the stack's fixed-aspect-ratio thumbnails never have to match
+   the live card's content-driven height. */
+.card-scene {
+  position: relative;
   width: 100%;
   max-width: 340px;
+  margin: 0 auto;
+}
+
+.card {
+  --rot: 0deg;
+  position: relative; /* keeps the live card painted above .card-stack -- see below */
+  width: 100%;
   border-radius: 18px;
   padding: 14px;
   border: 3px solid var(--frame-border);
@@ -153,6 +233,77 @@ main {
   transform: rotate(var(--rot));
   transition: transform 0.25s ease;
 }
+
+/* Cards generated earlier this session, fanned out behind the live card.
+   Positioned (like .card above) with z-index:auto, so plain DOM order
+   decides paint order between the two -- .card-stack comes first in the
+   markup, so the live #card always paints on top without needing an
+   explicit z-index. */
+.card-stack {
+  position: absolute;
+  inset: 0;
+}
+
+.card.stack-card {
+  /* Each nth-last-child rule below only sets these -- the shared transform
+     underneath composes them, so a container hover (bigger --ty, see the
+     "spread" rules below) and a single card's own --lift never fight each
+     other, they just add up. */
+  --tx: 0px;
+  --ty: 0px;
+  --trot: 0deg;
+  --tscale: 1;
+  --lift: 0px;
+  position: absolute;
+  inset: 0;
+  aspect-ratio: 63 / 88;
+  height: auto;
+  cursor: pointer;
+  transform: translate(var(--tx), calc(var(--ty) + var(--lift))) rotate(var(--trot)) scale(var(--tscale));
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease, filter 0.2s ease;
+}
+
+.card.stack-card:hover,
+.card.stack-card:focus-visible {
+  --lift: -10px;
+  opacity: 1 !important;
+  filter: brightness(1.1);
+  outline: none;
+}
+
+.card-stack.busy {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Tucked fan: mostly vertical offset (small --tx) rather than diagonal, so
+   the sliver of each card that peeks out is a forgiving band, not a small
+   corner wedge that needs precise aim on both axes. --ty is chosen so each
+   card's bottom edge clears the one in front of it (which is *less*
+   scaled-down, so it isn't shrinking as fast as it's stepping down) by a
+   real ~28px margin -- not just "a bigger number than last time" -- so
+   every depth gets an actually-exposed band, not just the first one. */
+.card.stack-card:nth-last-child(1) { --tx: 12px; --ty: 45px; --trot: -3deg; --tscale: 0.97; opacity: 0.9; }
+.card.stack-card:nth-last-child(2) { --tx: -16px; --ty: 90px; --trot: 4deg; --tscale: 0.94; opacity: 0.75; }
+.card.stack-card:nth-last-child(3) { --tx: 18px; --ty: 135px; --trot: -4deg; --tscale: 0.91; opacity: 0.6; }
+.card.stack-card:nth-last-child(4) { --tx: -20px; --ty: 180px; --trot: 4deg; --tscale: 0.88; opacity: 0.45; }
+
+/* Spread: hovering (or tabbing into) the stack at all fans every card out
+   further before the user has aimed at any one of them specifically -- the
+   tucked band above is already enough to land this first hover, and from
+   there the wider clearance (~55px between bottoms, same reasoning as the
+   tucked state) makes the next click easy. Higher specificity than the
+   tucked rules above (four classes vs. three) so it overrides them with no
+   !important needed. Only --ty changes -- --tx/--trot/--tscale keep
+   cascading in from the tucked rule above. */
+.card-stack:hover .stack-card:nth-last-child(1),
+.card-stack:focus-within .stack-card:nth-last-child(1) { --ty: 70px; }
+.card-stack:hover .stack-card:nth-last-child(2),
+.card-stack:focus-within .stack-card:nth-last-child(2) { --ty: 140px; }
+.card-stack:hover .stack-card:nth-last-child(3),
+.card-stack:focus-within .stack-card:nth-last-child(3) { --ty: 210px; }
+.card-stack:hover .stack-card:nth-last-child(4),
+.card-stack:focus-within .stack-card:nth-last-child(4) { --ty: 280px; }
 
 /* Generate's "spell-storm" moment: the frame shudders and its colors
    flicker through the wheel while the new card is fetched, then the new
@@ -192,13 +343,26 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card {
+  .card,
+  .card.stack-card,
+  .mv-chips .mv-chip {
     transition: none;
   }
   .card.storming,
   .card.settling {
     animation: none;
   }
+}
+
+/* A gold header glow is Momir Vibe's stand-in for the real legendary crown
+   bar -- there's no card-frame art asset here to punch a crown into. */
+.card.legendary .card-header {
+  box-shadow: 0 0 0 1px var(--accent), 0 0 8px rgba(201, 162, 75, 0.65);
+}
+
+.card.legendary .card-name::before {
+  content: "♛ ";
+  color: var(--accent);
 }
 
 .card-header {
@@ -346,6 +510,20 @@ main {
   color: rgba(20, 17, 12, 0.65);
   text-align: center;
 }
+
+/* Rarity dot color mirrors the real expansion-symbol convention. */
+.rarity-gem {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+}
+.rarity-gem.rarity-common { background: #cfcbc0; border: 1px solid rgba(20, 17, 12, 0.5); }
+.rarity-gem.rarity-uncommon { background: #b0c4d8; }
+.rarity-gem.rarity-rare { background: #c9a24b; }
+.rarity-gem.rarity-mythic { background: linear-gradient(135deg, #e8622c, #ff8a50); }
 
 /* Color frames */
 .card.white   { --frame-a: #f8f4e3; --frame-b: #e5dcb8; }
