@@ -17,8 +17,6 @@ class Card(BaseModel):
     toughness: int | str = Field(..., description="'*' when rules_text defines it (e.g. \"~'s toughness is equal to...\")")
     keywords: list[str] = Field(default_factory=list)
     rules_text: list[str] = Field(default_factory=list)
-    flavor_text: str | None = None
-    rarity: str
     set_name: str = "Momir Vibe"
     set_code: str = "MMV"
     collector_number: str

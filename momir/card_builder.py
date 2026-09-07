@@ -17,7 +17,6 @@ from .corpus import Corpus, get_corpus
 from .models import Card
 from .names import NameChains, build_name_chains, generate_name
 
-RARITY_WEIGHTS = {"common": 40, "uncommon": 30, "rare": 20, "mythic": 10}
 MIN_MANA_VALUE = 0
 MAX_MANA_VALUE = 16
 
@@ -46,11 +45,6 @@ class CardGenerator:
             self.corpus, self.reroll_vocab
         )
         self._next_collector_number = 1
-
-    def _rarity(self, rng: random.Random) -> str:
-        pool = list(RARITY_WEIGHTS.keys())
-        weights = list(RARITY_WEIGHTS.values())
-        return rng.choices(pool, weights=weights)[0]
 
     def _collector_number(self) -> str:
         number = self._next_collector_number
@@ -110,7 +104,6 @@ class CardGenerator:
             toughness=toughness,
             keywords=keywords,
             rules_text=rules_text,
-            rarity=self._rarity(rng),
             collector_number=self._collector_number(),
             artist=artist,
             art_url=art_url,

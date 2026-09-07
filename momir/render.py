@@ -4,8 +4,8 @@ way it might pull one from Scryfall) can point at GET /cards/generate/image
 instead of the JSON endpoint.
 
 Drawn fresh with Pillow rather than reusing static/style.css: no headless
-browser dependency, and the color-only parts of the web card (frame
-gradient per color, rarity gem) have no B&W equivalent worth building.
+browser dependency, and the web card's color frame gradient has no B&W
+equivalent worth building.
 Nothing here is ever written to disk -- render_card_png returns PNG bytes
 from an in-memory buffer, so there's nothing to clean up after serving it.
 """
@@ -201,8 +201,8 @@ def render_card_png(card: Card) -> bytes:
     draw.rectangle(pt_box, outline=0, width=3, fill=255)
     _draw_text_centered(draw, pt_box, f"{card.power}/{card.toughness}", font_pt)
 
-    # Meta line: rarity, set, collector number, artist.
-    meta = f"{card.rarity} • {card.set_name} #{card.collector_number} • {card.artist}"
+    # Meta line: set, collector number, artist.
+    meta = f"{card.set_name} #{card.collector_number} • {card.artist}"
     meta = _truncate(meta, font_meta, CARD_W - 2 * MARGIN - 32)
     _draw_text_centered(draw, (MARGIN, META_Y, CARD_W - MARGIN, META_Y + 24), meta, font_meta)
 

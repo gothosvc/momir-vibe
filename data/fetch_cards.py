@@ -45,7 +45,6 @@ KEEP_FIELDS = (
     "toughness",
     "colors",
     "keywords",
-    "rarity",
     "artist",
 )
 

@@ -98,8 +98,7 @@ function populateCard(root, card, extraClass = "") {
 
   root.querySelector(".card-pt").textContent = `${card.power}/${card.toughness}`;
   root.querySelector(".card-meta").innerHTML =
-    `<span class="rarity-gem rarity-${escapeHtml(card.rarity)}"></span>` +
-    `${escapeHtml(card.rarity)} • ${escapeHtml(card.set_name)} #${escapeHtml(card.collector_number)} • ${escapeHtml(card.artist)}`;
+    `${escapeHtml(card.set_name)} #${escapeHtml(card.collector_number)} • ${escapeHtml(card.artist)}`;
 }
 
 function renderCard(card, { animateSettle = false } = {}) {

@@ -21,7 +21,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from .corpus import Corpus, mana_value_weight
+from .corpus import Corpus, mana_value_weight, nearest_cmc
 
 KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasionally more
 # ~97% of real creatures print some oracle text; 0.55 was making generated
@@ -67,12 +67,9 @@ def _keyword_pool(corpus: Corpus, mana_value: int, mayhem: bool) -> tuple[Counte
                 values.setdefault(name, []).extend(vals)
         return names, values
 
-    cmc = mana_value if corpus.keywords_by_cmc.get(mana_value) else None
+    cmc = mana_value if corpus.keywords_by_cmc.get(mana_value) else nearest_cmc(corpus.keywords_by_cmc, mana_value)
     if cmc is None:
-        available = [c for c, counter in corpus.keywords_by_cmc.items() if counter]
-        if not available:
-            return Counter(), {}
-        cmc = min(available, key=lambda c: (abs(c - mana_value), c))
+        return Counter(), {}
     return corpus.keywords_by_cmc[cmc], corpus.keyword_values_by_cmc.get(cmc, {})
 
 

@@ -597,20 +597,6 @@ main {
   text-align: center;
 }
 
-/* Rarity dot color mirrors the real expansion-symbol convention. */
-.rarity-gem {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  margin-right: 0.3rem;
-  vertical-align: middle;
-}
-.rarity-gem.rarity-common { background: #cfcbc0; border: 1px solid rgba(20, 17, 12, 0.5); }
-.rarity-gem.rarity-uncommon { background: #b0c4d8; }
-.rarity-gem.rarity-rare { background: #c9a24b; }
-.rarity-gem.rarity-mythic { background: linear-gradient(135deg, #e8622c, #ff8a50); }
-
 /* Color frames */
 .card.white   { --frame-a: #f8f4e3; --frame-b: #e5dcb8; }
 .card.blue    { --frame-a: #aecbea; --frame-b: #4f7fb3; }

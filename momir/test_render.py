@@ -26,7 +26,6 @@ _BASE_KWARGS = dict(
         "Whenever this creature attacks, put a +1/+1 counter on it.",
         "This creature's toughness is equal to the number of creatures you control.",
     ],
-    rarity="mythic",
     set_name="Momir Vibe",
     set_code="MMV",
     collector_number="1",

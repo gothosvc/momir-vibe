@@ -17,7 +17,7 @@ from __future__ import annotations
 import random
 import re
 
-from .corpus import Corpus, mana_value_weight
+from .corpus import Corpus, mana_value_weight, nearest_cmc
 
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
 _COLOR_ORDER = "WUBRG"
@@ -42,13 +42,6 @@ def colors_in_symbols(symbols: list[str]) -> list[str]:
             if letter in _COLOR_ORDER:
                 found.add(letter)
     return [c for c in _COLOR_ORDER if c in found]
-
-
-def _nearest_available_cmc(corpus: Corpus, mana_value: int) -> int | None:
-    available = corpus.available_cmcs
-    if not available:
-        return None
-    return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
 
 
 def _adapt_to_mana_value(template: str, mana_value: int) -> str:
@@ -100,7 +93,7 @@ def synthesize_mana_cost(
     # Fall back: borrow the colored-pip pattern from the nearest mana value
     # we have real data for, then rebuild the generic portion so the total
     # mana value matches what was requested.
-    nearest = _nearest_available_cmc(corpus, mana_value)
+    nearest = nearest_cmc(corpus.mana_costs_by_cmc, mana_value)
     if nearest is None:
         return build_cost_string([str(mana_value)])
 

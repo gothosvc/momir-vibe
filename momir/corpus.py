@@ -220,8 +220,6 @@ class Corpus:
         default_factory=lambda: defaultdict(lambda: defaultdict(list))
     )
 
-    rarities: list[str] = field(default_factory=list)
-
     # Color identity tuple (WUBRG order, e.g. ("U", "B"); () for colorless)
     # -> list of (art_crop_url, artist) pairs from real creatures with that
     # exact color combination -- picking real art for a generated card
@@ -237,16 +235,25 @@ class Corpus:
     # e.g. 4-5 color identities), see momir/art.py.
     all_art: list[tuple[str, str]] = field(default_factory=list)
 
-    @property
-    def available_cmcs(self) -> list[int]:
-        return sorted(self.mana_costs_by_cmc.keys())
-
 
 def mana_value_weight(cmc: int, mana_value: int) -> float:
     """How much a cmc bucket should contribute to a mayhem pool centered on
     mana_value -- 1.0 at distance 0, decaying but never reaching zero, so
     mayhem still favors nearby mana values without fully excluding any."""
     return 1.0 / (1 + abs(cmc - mana_value))
+
+
+def nearest_cmc(buckets: dict[int, object], mana_value: int) -> int | None:
+    """The cmc key in `buckets` closest to mana_value, among keys with a
+    non-empty value (ties broken toward the lower cmc) -- None if every
+    bucket is empty. Shared by every non-mayhem "exact cmc, else nearest"
+    fallback (subtype_pool below, colors.py, stats.py, text.py's
+    _keyword_pool) -- mayhem's own distance-weighted pooling doesn't use
+    this, see mana_value_weight above."""
+    available = [cmc for cmc, v in buckets.items() if v]
+    if not available:
+        return None
+    return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
 
 
 def subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False, weighted: bool = True) -> Counter:
@@ -267,11 +274,8 @@ def subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False, weighted
     if pool:
         return pool
 
-    available = [cmc for cmc, counter in corpus.subtypes_by_cmc.items() if counter]
-    if not available:
-        return Counter()
-    nearest = min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
-    return corpus.subtypes_by_cmc[nearest]
+    nearest = nearest_cmc(corpus.subtypes_by_cmc, mana_value)
+    return corpus.subtypes_by_cmc[nearest] if nearest is not None else Counter()
 
 
 def _numeric(value) -> float | None:
@@ -596,10 +600,6 @@ def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = Non
                 continue
             corpus.keywords_by_cmc[cmc][keyword] += 1
             corpus.keyword_values_by_cmc[cmc][keyword].append(value)
-
-        rarity = card.get("rarity")
-        if rarity:
-            corpus.rarities.append(rarity)
 
     _prune_rare_keywords(corpus)
     return corpus
