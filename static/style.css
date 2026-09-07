@@ -287,6 +287,13 @@ main {
   width: 100%;
   max-width: 340px;
   margin: 0 auto;
+  /* Reserves real flow height down to the fanned stack's deepest hover
+     position, so .site-footer below always sits clear of it instead of the
+     stack (position:absolute, so it doesn't otherwise contribute to this
+     box's height) overlapping footer text. 280px is nth-last-child(4)'s
+     hover --ty (see .card-stack:hover rules below); ~475px is a stack
+     card's own height at this box's max-width (aspect-ratio 63/88). */
+  min-height: 760px;
 }
 
 /* Grounds the live card in the scene -- a soft pool on the "table" reads as

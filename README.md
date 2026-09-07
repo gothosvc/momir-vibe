@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Countless Gears Renegade, a 2-mana blue common Scout with an activated ability that pumps attacking Spirits">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Voice of Truth, a 5-mana red mythic Horror with Landcycling and a token-creating trigger on enter-or-attack">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Salt Road Quartermasters, an 11-mana green common Plant Eldrazi with Cumulative upkeep, Defender, a damage-assignment swap, and a life-for-mana cost reducer">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Magus of the Heavens, a 2-mana white Goblin Gremlin with Changeling and two triggered abilities">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Minion of the Scorpion, a 6-mana white Processor with a fight-target activated ability and an evasion restriction">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Zirit, an 11-mana colorless Angel with Indestructible, a graveyard-recursion trigger, and a board-wipe trigger">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
@@ -15,7 +15,7 @@ Three cards generated at different mana values from the mockup page in `static/`
 There's also a black & white, card-shaped PNG meant for "printer" Momir Vig setups that pull a random card *image* rather than JSON:
 
 <p>
-  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Knight of Valor, a 4-mana blue common Construct Merfolk with an attack-trigger pump ability, rendered as a dithered card-shaped PNG">
+  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Ramiteer, a 5-mana Elemental with Investigate twice, Trample, a combat-damage creature-steal trigger, and a token-creating enter trigger, rendered as a dithered card-shaped PNG">
 </p>
 
 ## How it works
