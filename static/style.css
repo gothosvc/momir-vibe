@@ -19,7 +19,10 @@ body {
   margin: 0;
   min-height: 100vh;
   position: relative;
-  background: var(--page-bg);
+  background:
+    radial-gradient(ellipse 900px 520px at 50% 0%, rgba(201, 162, 75, 0.07), transparent 65%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 5px),
+    radial-gradient(ellipse 1200px 900px at 50% 30%, #202024, #131316 75%);
   color: var(--page-fg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   display: flex;
@@ -80,11 +83,13 @@ main {
   align-items: flex-start;
   justify-content: center;
   gap: 1.25rem;
-  background: #26262c;
+  background: linear-gradient(180deg, #2d2d34 0%, #232329 60%, #1f1f25 100%);
   padding: 1rem 1.25rem;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(201, 162, 75, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 4px 16px rgba(0, 0, 0, 0.35);
   position: sticky;
   top: 0.75rem;
   z-index: 1;
@@ -278,9 +283,26 @@ main {
    the live card's content-driven height. */
 .card-scene {
   position: relative;
+  z-index: 0; /* gives ::after's z-index:-1 below a local stacking context to sink into, instead of escaping to the page's */
   width: 100%;
   max-width: 340px;
   margin: 0 auto;
+}
+
+/* Grounds the live card in the scene -- a soft pool on the "table" reads as
+   the card sitting on a surface, instead of the box-shadow on .card alone
+   making it look like it's just floating in front of a flat background. */
+.card-scene::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  width: 78%;
+  height: 34px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55), transparent 72%);
+  filter: blur(6px);
+  z-index: -1;
 }
 
 .card {
