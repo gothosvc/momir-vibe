@@ -5,7 +5,7 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Denerythi, Mand Cale, a 2-mana red Merfolk with two triggered token/pump abilities">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Ian Prid, Sunmaster, a 2-mana red Lizard with Exalted, Trample, and a clash/counter enter-trigger">
   <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Master of Pearls, a 6-mana green Giant with Flying and an enter-triggered fight ability">
   <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Custodian of the Pride, an 11-mana colorless Elemental with Cumulative upkeep and an enter-triggered animate-artifacts ability">
 </p>

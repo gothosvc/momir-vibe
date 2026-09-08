@@ -7,13 +7,18 @@ names creatures:
   word-level Markov chain, so the result is always assembled from actual
   English words pulled from real cards, never invented syllables.
 - Legendary creatures get personal character names ("Jace", "Chandra, Fire
-  Artisan") -- the given name from a character-level Markov chain, free to
-  invent new syllables since that's exactly how invented character names are
-  supposed to sound (see momir/markov.py's CharMarkovChain); the epithet
-  after the comma ("Fire Artisan", "the Mind Sculptor"), when there is one,
-  is instead a real English phrase, so it's generated the same word-level way
-  as an ordinary creature's name -- recombining real epithet words rather
-  than inventing new ones.
+  Artisan", "Abaddon the Despoiler") -- the given name from a
+  character-level Markov chain, free to invent new syllables since that's
+  exactly how invented character names are supposed to sound (see
+  momir/markov.py's CharMarkovChain); the epithet, when there is one, is
+  instead a real English phrase ("Fire Artisan", "the Despoiler"), so it's
+  generated the same word-level way as an ordinary creature's name --
+  recombining real epithet words rather than inventing new ones. Real
+  legendary names use two different epithet conventions -- a comma
+  ("Chandra, Fire Artisan") or none, relying on the epithet's own leading
+  "the"/"of" instead ("Abaddon the Despoiler") -- trained as two separate
+  word pools since only the second is guaranteed to start with a word that
+  reads right with no comma before it.
 
 How often a generated card gets a character name mirrors how often real
 creatures are legendary, so this doesn't have to hand-tune a probability
@@ -22,6 +27,7 @@ that'll drift out of sync with the corpus.
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 
 from .corpus import Corpus
@@ -41,49 +47,76 @@ COMMON_NAME_ATTEMPTS = 25
 # stopping early on "of"/"the" reads as obviously cut off ("Kami of the").
 _DANGLING_STOPWORDS = {"of", "the", "and", "an", "a", "in", "on", "to"}
 
+# A comma-less legendary name's epithet half, when it has one, always opens
+# with "the"/"of" ("Abaddon the Despoiler", "Araumi of the Dead Tide") --
+# that leading word is the only signal (no comma) that it's an epithet and
+# not just more of the given name, so splitting anywhere else would either
+# cut a real epithet in half or wrongly carve one out of a plain multi-word
+# name that has neither ("Achilles Davenport"). `given` is non-greedy so it
+# grabs as little as possible before the first "the"/"of".
+_BARE_EPITHET_RE = re.compile(r"^(?P<given>.+?)\s+(?P<epithet>(?:the|of)\b.*)$")
+
 
 @dataclass
 class NameChains:
     character: CharMarkovChain
     common: WordMarkovChain
-    epithet: WordMarkovChain
+    comma_epithet: WordMarkovChain
+    bare_epithet: WordMarkovChain
     # Share of generated names that should use the character chain, set to
     # match the real corpus's legendary/non-legendary split.
     character_chance: float
-    # Share of legendary names that carry a ", Epithet" (vs. a bare given
-    # name like "Jace"), set to match the real corpus's own split.
+    # Share of legendary names that carry any epithet at all (comma or
+    # bare), set to match the real corpus's own split.
     epithet_chance: float
+    # Of legendary names with an epithet, the share using the comma
+    # convention rather than the bare "the"/"of" one -- see _BARE_EPITHET_RE.
+    comma_epithet_share: float
 
 
 def build_name_chains(corpus: Corpus) -> NameChains:
     given_names: list[str] = []
-    epithets: list[str] = []
+    comma_epithets: list[str] = []
+    bare_epithets: list[str] = []
     for name in corpus.character_names:
         given, sep, epithet = name.partition(",")
-        given_names.append(given.strip())
         if sep:
-            epithets.append(epithet.strip())
+            given_names.append(given.strip())
+            comma_epithets.append(epithet.strip())
+            continue
+        match = _BARE_EPITHET_RE.match(name)
+        if match:
+            given_names.append(match.group("given").strip())
+            bare_epithets.append(match.group("epithet").strip())
+        else:
+            given_names.append(name.strip())
 
     character = CharMarkovChain(order=CHARACTER_NAME_MARKOV_ORDER)
     character.train(given_names)
 
     common = WordMarkovChain(order=COMMON_NAME_WORD_ORDER)
-    epithet_chain = WordMarkovChain(order=COMMON_NAME_WORD_ORDER)
+    comma_epithet_chain = WordMarkovChain(order=COMMON_NAME_WORD_ORDER)
+    bare_epithet_chain = WordMarkovChain(order=COMMON_NAME_WORD_ORDER)
     # WordMarkovChain trains on (sentence, position, shape) triples; names
     # don't have a construct "shape" the way rules text does, so every name
     # gets the same constant tag -- shape-splitting is a no-op here.
     common.train([(name, 0, "name") for name in corpus.common_names])
-    epithet_chain.train([(epithet, 0, "epithet") for epithet in epithets])
+    comma_epithet_chain.train([(e, 0, "epithet") for e in comma_epithets])
+    bare_epithet_chain.train([(e, 0, "epithet") for e in bare_epithets])
 
     total = len(corpus.character_names) + len(corpus.common_names)
     character_chance = (len(corpus.character_names) / total) if total else 0.0
-    epithet_chance = (len(epithets) / len(given_names)) if given_names else 0.0
+    epithet_total = len(comma_epithets) + len(bare_epithets)
+    epithet_chance = (epithet_total / len(given_names)) if given_names else 0.0
+    comma_epithet_share = (len(comma_epithets) / epithet_total) if epithet_total else 1.0
     return NameChains(
         character=character,
         common=common,
-        epithet=epithet_chain,
+        comma_epithet=comma_epithet_chain,
+        bare_epithet=bare_epithet_chain,
         character_chance=character_chance,
         epithet_chance=epithet_chance,
+        comma_epithet_share=comma_epithet_share,
     )
 
 
@@ -114,7 +147,12 @@ def generate_name(chains: NameChains, rng: random.Random | None = None) -> str:
     # attempt above came up empty/dangling.
     given = chains.character.generate_title(rng=rng)
     if rng.random() < chains.epithet_chance:
-        epithet = _generate_words(chains.epithet, rng, MAX_COMMON_NAME_WORDS)
-        if epithet:
-            return f"{given}, {epithet}"
+        if rng.random() < chains.comma_epithet_share:
+            epithet = _generate_words(chains.comma_epithet, rng, MAX_COMMON_NAME_WORDS)
+            if epithet:
+                return f"{given}, {epithet}"
+        else:
+            epithet = _generate_words(chains.bare_epithet, rng, MAX_COMMON_NAME_WORDS)
+            if epithet:
+                return f"{given} {epithet}"
     return given
