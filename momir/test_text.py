@@ -44,6 +44,16 @@ STATIC_SENTENCES = [
     "Put three -1/-1 counters on target creature.",
     "Create two 1/1 white Soldier creature tokens.",  # count must never change
 ]
+# Real multi-sentence paragraphs, offered whole -- see corpus.py's
+# compound_sentences_by_cmc. Must never appear split into pool.heads/tails.
+COMPOUND_TRIGGER = (
+    "Whenever this creature attacks, put a +1/+1 counter on it. "
+    "If it's still attacking, it gains menace until end of turn."
+)
+COMPOUND_ACTIVATED = (
+    "Sacrifice a creature: Put two +1/+1 counters on this creature. "
+    "Activate only once each turn."
+)
 
 
 def _build_corpus() -> Corpus:
@@ -53,6 +63,10 @@ def _build_corpus() -> Corpus:
         + [(s, 0, "activated") for s in ACTIVATED_SENTENCES]
         + [(s, 0, "static") for s in STATIC_SENTENCES]
     )
+    corpus.compound_sentences_by_cmc[MANA_VALUE] = [
+        (COMPOUND_TRIGGER, 0, "trigger"),
+        (COMPOUND_ACTIVATED, 0, "activated"),
+    ]
     # "regenerate" is a real tracked keyword that never appears in a safe
     # "has/have/gains X" context in this fixture corpus (only as the verb in
     # ACTIVATED_SENTENCES' "Regenerate this creature.") -- it must never be
@@ -88,12 +102,20 @@ def main() -> None:
         "a keyword only ever seen as a verb/header must never become a reroll candidate"
     )
 
+    assert COMPOUND_TRIGGER in pool.sentences[("trigger", 0)], "compound must be sampleable whole"
+    assert COMPOUND_ACTIVATED in pool.sentences[("activated", 0)], "compound must be sampleable whole"
+    for shape in ("trigger", "activated", "static"):
+        assert COMPOUND_TRIGGER not in pool.heads.get((shape, 0), []), "a compound must never become a head"
+        assert COMPOUND_TRIGGER not in pool.tails.get((shape, 0), []), "a compound must never become a tail"
+        assert COMPOUND_ACTIVATED not in pool.heads.get((shape, 0), []), "a compound must never become a head"
+        assert COMPOUND_ACTIVATED not in pool.tails.get((shape, 0), []), "a compound must never become a tail"
+
     known_texts = set(TRIGGER_SENTENCES + ACTIVATED_SENTENCES + STATIC_SENTENCES) | {
         head + tail
         for shape in ("trigger", "activated")
         for head in pool.heads[(shape, 0)]
         for tail in pool.tails[(shape, 0)]
-    }
+    } | {COMPOUND_TRIGGER, COMPOUND_ACTIVATED}
     known_skeletons = {_skeleton(t.replace("~", CARD_NAME), vocab) for t in known_texts}
 
     seen_values: dict[str, set[str]] = {}

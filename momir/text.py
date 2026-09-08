@@ -406,25 +406,49 @@ class SentencePool:
     subtype_refs: list[str]
 
 
-def _build_pool(sentences: list[tuple[str, int, str]], vocab: RerollVocab) -> SentencePool:
-    keyword_refs, subtype_refs = _mine_reference_pools(sentences, vocab)
-    return SentencePool(*_bucket_sentences(sentences), _mine_number_pools(sentences), keyword_refs, subtype_refs)
+def _build_pool(
+    sentences: list[tuple[str, int, str]],
+    vocab: RerollVocab,
+    compounds: list[tuple[str, int, str]] = (),
+) -> SentencePool:
+    """`compounds` -- real multi-sentence paragraphs (see corpus.py's
+    compound_sentences_by_cmc) -- are merged into the bucketed whole-sentence
+    pool *after* _bucket_sentences runs, never passed through it: a compound
+    must never enter heads/tails, or the recombination path in
+    generate_rules_text could glue its own tail (a clarifier that only makes
+    sense following its own specific effect) onto a completely unrelated
+    head. They're still mined for reroll values same as any sentence, since
+    that mining has no single-sentence assumption."""
+    mining_input = sentences + list(compounds)
+    keyword_refs, subtype_refs = _mine_reference_pools(mining_input, vocab)
+    pool = SentencePool(*_bucket_sentences(sentences), _mine_number_pools(mining_input), keyword_refs, subtype_refs)
+    for compound, position, shape in compounds:
+        pool.sentences[(shape, position)].append(compound)
+    return pool
 
 
 def build_sentence_pools(corpus: Corpus, mana_values: range, vocab: RerollVocab) -> dict[int, SentencePool]:
-    """One sentence pool per mana value, each drawn only from sentences of
-    creatures at (or, if sparse, near) that mana value."""
+    """One sentence pool per mana value, each drawn only from sentences (and
+    compound paragraphs, unwidened -- see _build_pool) of creatures at (or,
+    if sparse, near) that mana value."""
     return {
-        mana_value: _build_pool(_sentences_for_mana_value(corpus, mana_value), vocab) for mana_value in mana_values
+        mana_value: _build_pool(
+            _sentences_for_mana_value(corpus, mana_value),
+            vocab,
+            corpus.compound_sentences_by_cmc.get(mana_value, []),
+        )
+        for mana_value in mana_values
     }
 
 
 def build_mayhem_sentence_pool(corpus: Corpus, vocab: RerollVocab) -> SentencePool:
-    """A single pool drawn from sentences at every mana value, for
-    mayhem=text/full -- unlike build_sentence_pools this doesn't vary by
-    mana value, so it's built once rather than per mana value."""
+    """A single pool drawn from sentences (and compound paragraphs) at every
+    mana value, for mayhem=text/full/unhinged -- unlike build_sentence_pools
+    this doesn't vary by mana value, so it's built once rather than per mana
+    value."""
     all_sentences = list(itertools.chain.from_iterable(corpus.sentences_by_cmc.values()))
-    return _build_pool(all_sentences, vocab)
+    all_compounds = list(itertools.chain.from_iterable(corpus.compound_sentences_by_cmc.values()))
+    return _build_pool(all_sentences, vocab, all_compounds)
 
 
 def _pick(bucket: dict[tuple[str, int], list[str]], shape: str, position: int) -> list[str]:

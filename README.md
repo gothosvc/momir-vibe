@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: White Orchid, a 2-mana black Wizard Lord with a sacrifice-to-regenerate activated ability">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Disciple of Perdition, a 6-mana white Eldrazi God with Reach and a death-triggered ability">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Wall of Vipers, an 11-mana colorless Golem with Reach and two sacrifice-based activated abilities">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Denerythi, Mand Cale, a 2-mana red Merfolk with two triggered token/pump abilities">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Master of Pearls, a 6-mana green Giant with Flying and an enter-triggered fight ability">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Custodian of the Pride, an 11-mana colorless Elemental with Cumulative upkeep and an enter-triggered animate-artifacts ability">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
@@ -15,7 +15,7 @@ Three cards generated at different mana values from the mockup page in `static/`
 There's also a black & white, card-shaped PNG meant for "printer" Momir Vig setups that pull a random card *image* rather than JSON:
 
 <p>
-  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Nessian Game Warden, a 5-mana blue Dragon with Horsemanship and a Landfall trigger, rendered as a dithered card-shaped PNG">
+  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Fixer, a 4-mana black Scarecrow with Trample and a layered Exert setup/payoff ability, rendered as a dithered card-shaped PNG">
 </p>
 
 ## How it works
@@ -25,7 +25,7 @@ Every part of a card — name, mana cost, type line, power/toughness, keywords, 
 | Piece | Module |
 |---|---|
 | Names (word-level Markov for ordinary creatures, character-level for legendary) | `momir/names.py` |
-| Rules text + keywords (sampled real sentences, recombined only at real grammatical seams) | `momir/text.py` |
+| Rules text + keywords (sampled real sentences, recombined only at real grammatical seams; multi-sentence "compound" paragraphs are sampled whole, never split, for layered effects) | `momir/text.py` |
 | Mana cost | `momir/colors.py` |
 | Power/toughness | `momir/stats.py` |
 | Type line | `momir/types.py` |

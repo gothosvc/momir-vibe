@@ -40,6 +40,14 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 # text. See momir/text.py's SentencePool.
 MAX_SENTENCE_POSITION = 2
 
+# A "compound" is a single real oracle-text paragraph containing 2+ real
+# sentences ("Whenever X, Y. If Z, W."), captured and offered whole -- see
+# _extract_sentences' second return value and momir/text.py's _build_pool.
+# Capped so an unusually long paragraph doesn't dominate generated card
+# length; more than this many real sentences in one paragraph is rare enough
+# to just skip rather than train on.
+MAX_COMPOUND_SENTENCES = 3
+
 # Sentence "shape" -- the construct it belongs to -- kept separate from
 # position (see above) because mixing sentences across *these* is what
 # produces nonsense that reads as outright broken rather than just
@@ -241,6 +249,17 @@ class Corpus:
     #     with an unrelated activated ability's cost:effect clause.
     # See momir/text.py's SentencePool.
     sentences_by_cmc: dict[int, list[tuple[str, int, str]]] = field(default_factory=lambda: defaultdict(list))
+
+    # cmc -> list of (paragraph, position, shape) triples, same shape as
+    # sentences_by_cmc above but each entry is a *whole real paragraph*
+    # containing 2+ sentences ("Whenever X, Y. If Z, W.") rather than one --
+    # see _extract_sentences and MAX_COMPOUND_SENTENCES. Bucketed by cmc for
+    # the same reason as sentences_by_cmc. Only ever offered whole (never
+    # split at a seam, never recombined with another sentence's half) -- see
+    # momir/text.py's _build_pool.
+    compound_sentences_by_cmc: dict[int, list[tuple[str, int, str]]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
 
     # cmc -> list of raw mana_cost strings actually used at that cmc
     mana_costs_by_cmc: dict[int, list[str]] = field(default_factory=lambda: defaultdict(list))
@@ -512,8 +531,39 @@ def has_dangling_die_roll(sentence: str) -> bool:
     return bool(_DIE_ROLL_RE.search(sentence) or _ROLL_RESULT_RE.search(sentence))
 
 
-def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[str, int, str]]:
-    """Returns (sentence, position, shape) triples; see _sentence_shape.
+# "If you do"/"if you don't" pays off a "you may ..." choice posed
+# elsewhere -- almost always a separate sentence ("You may sacrifice a
+# creature. If you do, draw a card."), same unguaranteed pairing problem as
+# an ungrounded "choose target" above (96% of real occurrences checked
+# against this corpus). Real oracle text does occasionally pose the choice
+# and its payoff in one sentence -- joined by a semicolon rather than a
+# period, so it was never split into two sentences to begin with -- which is
+# the one case exempted here; everything else is presumed to lean on a
+# separate setup sentence this generator can't guarantee.
+_IF_YOU_DO_RE = re.compile(r"\bif you (?:do|don't)\b", re.IGNORECASE)
+_YOU_MAY_RE = re.compile(r"\byou may\b", re.IGNORECASE)
+
+
+def has_dangling_if_you_do(sentence: str) -> bool:
+    """True if `sentence` pays off an "if you do"/"if you don't" whose
+    "you may ..." choice isn't posed within itself -- see the comment above.
+    A sentence failing this check is excluded from sentences_by_cmc
+    entirely, same as has_ungrounded_x."""
+    if not _IF_YOU_DO_RE.search(sentence):
+        return False
+    return not _YOU_MAY_RE.search(sentence)
+
+
+def _extract_sentences(
+    oracle_text: str | None, name: str = ""
+) -> tuple[list[tuple[str, int, str]], list[tuple[str, int, str]]]:
+    """Returns (sentences, compounds) -- each a list of (text, position,
+    shape) triples; see _sentence_shape. `sentences` is one entry per real
+    sentence, same as always. `compounds` is one entry per real *paragraph*
+    that contains 2+ real sentences ("Whenever X, Y. If Z, W."), captured
+    whole (never split apart) alongside the individual sentences it also
+    contributes to `sentences` -- see MAX_COMPOUND_SENTENCES and
+    momir/text.py's _build_pool.
 
     `position` counts every real candidate sentence in printed order --
     including ones dropped from training below (template fragments, quoted
@@ -525,10 +575,12 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
     offered up as if it were a real opener. (Real case that surfaced this:
     Dáin Ironfoot's first sentence quotes a granted ability and gets
     dropped, and without this, "When you do, attach it to target creature
-    you control." would shift into position 0.)"""
+    you control." would shift into position 0.) A compound is tagged with
+    the position of its first sentence, same convention."""
     if not oracle_text:
-        return []
+        return [], []
     sentences = []
+    compounds = []
     position = 0
     for line in oracle_text.split("\n"):
         line = _REMINDER_TEXT_RE.sub("", line).strip()
@@ -539,7 +591,30 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
             continue
         if name:
             line = _normalize_self_references(line, name)
-        for sentence in _SENTENCE_SPLIT_RE.split(line):
+        pieces = _SENTENCE_SPLIT_RE.split(line)
+        line_position = position
+        # A compound needs every dangling-clause guard applied to the whole
+        # paragraph rather than to one isolated sentence -- e.g. a "choose
+        # target" in the first sentence resolved by "then" in the second is
+        # only visible when has_dangling_choice sees the full text. Shape is
+        # taken from the paragraph's own opening sentence, not the whole
+        # blob, so a stray colon in a later sentence can't misclassify it.
+        if (
+            2 <= len(pieces) <= MAX_COMPOUND_SENTENCES
+            and line.endswith((".", "!", "?"))
+            and '"' not in line
+        ):
+            compound_shape = _sentence_shape(pieces[0])
+            if (
+                not has_ungrounded_x(line, compound_shape)
+                and not has_dangling_choice(line)
+                and not has_dangling_mana_reference(line)
+                and not has_dangling_die_roll(line)
+                and not has_dangling_pay(line)
+                and not has_dangling_if_you_do(line)
+            ):
+                compounds.append((line, line_position, compound_shape))
+        for sentence in pieces:
             sentence = sentence.strip()
             if not sentence:
                 continue
@@ -559,10 +634,11 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
             # so quoted sentences are dropped rather than left to produce
             # stray dangling quote marks. Sentences with an ungrounded bare
             # "X", a dangling "choose target", a dangling "this mana", a
-            # dangling die roll, or a dangling "you may pay" are dropped for
-            # the same reason -- see has_ungrounded_x / has_dangling_choice /
-            # has_dangling_mana_reference / has_dangling_die_roll /
-            # has_dangling_pay.
+            # dangling die roll, a dangling "you may pay", or a dangling "if
+            # you do" are dropped for the same reason -- see has_ungrounded_x
+            # / has_dangling_choice / has_dangling_mana_reference /
+            # has_dangling_die_roll / has_dangling_pay /
+            # has_dangling_if_you_do.
             shape = _sentence_shape(sentence)
             if (
                 sentence.endswith((".", "!", "?"))
@@ -572,10 +648,11 @@ def _extract_sentences(oracle_text: str | None, name: str = "") -> list[tuple[st
                 and not has_dangling_mana_reference(sentence)
                 and not has_dangling_die_roll(sentence)
                 and not has_dangling_pay(sentence)
+                and not has_dangling_if_you_do(sentence)
             ):
                 sentences.append((sentence, position, shape))
             position += 1
-    return sentences
+    return sentences, compounds
 
 
 def _load_raw() -> list[dict]:
@@ -628,8 +705,11 @@ def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = Non
         cmc = int(cmc)
         oracle_text = card.get("oracle_text") or ""
 
-        for sentence, position, shape in _extract_sentences(oracle_text, name or ""):
+        sentences, compounds = _extract_sentences(oracle_text, name or "")
+        for sentence, position, shape in sentences:
             corpus.sentences_by_cmc[cmc].append((sentence, min(position, MAX_SENTENCE_POSITION), shape))
+        for compound, position, shape in compounds:
+            corpus.compound_sentences_by_cmc[cmc].append((compound, min(position, MAX_SENTENCE_POSITION), shape))
 
         mana_cost = card.get("mana_cost")
         if mana_cost:
