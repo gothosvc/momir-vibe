@@ -73,6 +73,11 @@ def _build_corpus() -> Corpus:
     # drawn as a keyword_ref reroll candidate, only ever appear verbatim.
     corpus.keywords_by_cmc[MANA_VALUE] = Counter({"flying": 5, "trample": 3, "regenerate": 2})
     corpus.subtypes_by_cmc[MANA_VALUE] = Counter({"Human": 4, "Wizard": 2})
+    # 85% "has extra text" rate, same ballpark as real creatures -- see
+    # corpus.py's extra_text_rate. High enough that 1000 seeds below still
+    # exercise generate_rules_text's actual line-building on most of them.
+    corpus.extra_text_hits_by_cmc[MANA_VALUE] = 85
+    corpus.extra_text_totals_by_cmc[MANA_VALUE] = 100
     return corpus
 
 

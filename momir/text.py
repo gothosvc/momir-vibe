@@ -21,13 +21,9 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from .corpus import Corpus, mana_value_weight, nearest_cmc
+from .corpus import Corpus, extra_text_rate, mana_value_weight, nearest_cmc, overall_extra_text_rate
 
 KEYWORD_COUNT_WEIGHTS = [0, 0, 1, 1, 1, 2]  # skewed toward 0-1 keywords, occasionally more
-# ~97% of real creatures print some oracle text; 0.55 was making generated
-# cards noticeably blanker than that. Raised to sit closer to reality while
-# still leaving room for the occasional vanilla creature.
-EXTRA_TEXT_CHANCE = 0.85
 MAX_EXTRA_SENTENCES = 2
 
 # Chance a trigger/activated line is assembled from a condition/cost half of
@@ -36,6 +32,12 @@ MAX_EXTRA_SENTENCES = 2
 # grammatical delimiter (see _split_sentence) so recombination can't produce
 # the mid-sentence splices word-Markov generation used to.
 RECOMBINE_CHANCE = 0.5
+# Below this many whole sentences in a (shape, position) bucket, the same
+# handful of real lines would otherwise repeat verbatim across generations --
+# recombine much more readily instead, since head x tail combinations stay
+# varied even when whole sentences don't (see MIN_TRAINING_SENTENCES below).
+SPARSE_VERBATIM_THRESHOLD = 5
+SPARSE_RECOMBINE_CHANCE = 0.9
 
 # Minimum sentence pool a mana value's generated text wants before we trust
 # it to not read "samey". Sparse mana values (very low or very high mv have
@@ -111,18 +113,26 @@ def generate_keywords(
     return [_keyword_text(values_pool, name, card_name, rng) for name in chosen]
 
 
-def _sentences_for_mana_value(corpus: Corpus, mana_value: int) -> list[tuple[str, int, str]]:
-    """Sentences from creatures at this exact mana value, widened to
-    progressively further neighbors only if there isn't enough to pick from."""
-    collected = list(corpus.sentences_by_cmc.get(mana_value, []))
+def _sentences_for_mana_value(
+    corpus: Corpus, mana_value: int
+) -> tuple[list[tuple[str, int, str]], list[tuple[str, int, str]]]:
+    """(sentences, compounds) from creatures at this exact mana value, both
+    widened together to progressively further neighbors only if there isn't
+    enough sentences to pick from -- compounds ride along on the same radius
+    rather than being looked up unwidened, so they don't disappear at a
+    sparse mana value precisely when sentences already needed borrowing to
+    stay populated."""
+    sentences = list(corpus.sentences_by_cmc.get(mana_value, []))
+    compounds = list(corpus.compound_sentences_by_cmc.get(mana_value, []))
 
     radius = 1
-    while len(collected) < MIN_TRAINING_SENTENCES and radius <= MAX_BORROW_RADIUS:
+    while len(sentences) < MIN_TRAINING_SENTENCES and radius <= MAX_BORROW_RADIUS:
         for neighbor in (mana_value - radius, mana_value + radius):
-            collected.extend(corpus.sentences_by_cmc.get(neighbor, []))
+            sentences.extend(corpus.sentences_by_cmc.get(neighbor, []))
+            compounds.extend(corpus.compound_sentences_by_cmc.get(neighbor, []))
         radius += 1
 
-    return collected
+    return sentences, compounds
 
 
 def _split_sentence(sentence: str, shape: str) -> tuple[str, str] | None:
@@ -404,12 +414,17 @@ class SentencePool:
     number_pools: dict[str, list[str]]
     keyword_refs: list[str]
     subtype_refs: list[str]
+    # Real fraction of creatures this pool was drawn from that print any
+    # rules text at all -- see corpus.py's extra_text_rate/
+    # overall_extra_text_rate and generate_rules_text's use of it below.
+    extra_text_chance: float
 
 
 def _build_pool(
     sentences: list[tuple[str, int, str]],
+    compounds: list[tuple[str, int, str]],
     vocab: RerollVocab,
-    compounds: list[tuple[str, int, str]] = (),
+    extra_text_chance: float,
 ) -> SentencePool:
     """`compounds` -- real multi-sentence paragraphs (see corpus.py's
     compound_sentences_by_cmc) -- are merged into the bucketed whole-sentence
@@ -421,7 +436,13 @@ def _build_pool(
     that mining has no single-sentence assumption."""
     mining_input = sentences + list(compounds)
     keyword_refs, subtype_refs = _mine_reference_pools(mining_input, vocab)
-    pool = SentencePool(*_bucket_sentences(sentences), _mine_number_pools(mining_input), keyword_refs, subtype_refs)
+    pool = SentencePool(
+        *_bucket_sentences(sentences),
+        number_pools=_mine_number_pools(mining_input),
+        keyword_refs=keyword_refs,
+        subtype_refs=subtype_refs,
+        extra_text_chance=extra_text_chance,
+    )
     for compound, position, shape in compounds:
         pool.sentences[(shape, position)].append(compound)
     return pool
@@ -429,16 +450,13 @@ def _build_pool(
 
 def build_sentence_pools(corpus: Corpus, mana_values: range, vocab: RerollVocab) -> dict[int, SentencePool]:
     """One sentence pool per mana value, each drawn only from sentences (and
-    compound paragraphs, unwidened -- see _build_pool) of creatures at (or,
-    if sparse, near) that mana value."""
-    return {
-        mana_value: _build_pool(
-            _sentences_for_mana_value(corpus, mana_value),
-            vocab,
-            corpus.compound_sentences_by_cmc.get(mana_value, []),
-        )
-        for mana_value in mana_values
-    }
+    compound paragraphs) of creatures at (or, if sparse, near) that mana
+    value -- see _sentences_for_mana_value."""
+    pools = {}
+    for mana_value in mana_values:
+        sentences, compounds = _sentences_for_mana_value(corpus, mana_value)
+        pools[mana_value] = _build_pool(sentences, compounds, vocab, extra_text_rate(corpus, mana_value))
+    return pools
 
 
 def build_mayhem_sentence_pool(corpus: Corpus, vocab: RerollVocab) -> SentencePool:
@@ -448,7 +466,7 @@ def build_mayhem_sentence_pool(corpus: Corpus, vocab: RerollVocab) -> SentencePo
     value."""
     all_sentences = list(itertools.chain.from_iterable(corpus.sentences_by_cmc.values()))
     all_compounds = list(itertools.chain.from_iterable(corpus.compound_sentences_by_cmc.values()))
-    return _build_pool(all_sentences, vocab, all_compounds)
+    return _build_pool(all_sentences, all_compounds, vocab, overall_extra_text_rate(corpus))
 
 
 def _pick(bucket: dict[tuple[str, int], list[str]], shape: str, position: int) -> list[str]:
@@ -460,28 +478,39 @@ def _pick(bucket: dict[tuple[str, int], list[str]], shape: str, position: int) -
 
 
 def _reroll_line(text: str, pool: SentencePool, vocab: RerollVocab | None, rng: random.Random) -> str:
-    """Independently reroll every detected numeric/keyword/subtype slot in
-    `text` for a different real value drawn from the matching pool -- a
-    no-op for a slot whose pool is empty, or one that happens to redraw
-    what was already there. Numeric, keyword, and subtype vocabularies
-    never overlap in practice, so spans are only ever checked for overlap
-    within their own category (_extract_number_spans already does this for
-    numbers; re.finditer already returns non-overlapping matches within one
-    regex), not across categories."""
-    spans: list[tuple[int, int, list[str]]] = [
-        (start, end, pool.number_pools.get(kind, [])) for start, end, kind in _extract_number_spans(text)
+    """Reroll every detected numeric/keyword/subtype slot in `text` for a
+    different real value drawn from the matching pool -- a no-op for a slot
+    whose pool is empty, or one that happens to redraw what was already
+    there. Numeric, keyword, and subtype vocabularies never overlap in
+    practice, so spans are only ever checked for overlap within their own
+    category (_extract_number_spans already does this for numbers;
+    re.finditer already returns non-overlapping matches within one regex),
+    not across categories.
+
+    Two spans of the same kind with identical original text (e.g. "counters"
+    mentioned twice in one compound paragraph) draw once and reuse that draw
+    for every occurrence, rather than rerolling each independently -- so a
+    two-line effect that referred to the same value twice doesn't drift into
+    referring to two different ones."""
+    spans: list[tuple[int, int, str, list[str]]] = [
+        (start, end, kind, pool.number_pools.get(kind, [])) for start, end, kind in _extract_number_spans(text)
     ]
     if vocab is not None:
         if vocab.keyword_re is not None:
             # group 1 is the name alone -- the match also spans the
             # qualifying word before it ("has flying"), which stays put.
-            spans += [(m.start(1), m.end(1), pool.keyword_refs) for m in vocab.keyword_re.finditer(text)]
+            spans += [(m.start(1), m.end(1), "keyword", pool.keyword_refs) for m in vocab.keyword_re.finditer(text)]
         if vocab.subtype_re is not None:
-            spans += [(m.start(), m.end(), pool.subtype_refs) for m in vocab.subtype_re.finditer(text)]
+            spans += [(m.start(), m.end(), "subtype", pool.subtype_refs) for m in vocab.subtype_re.finditer(text)]
 
-    for start, end, candidates in sorted(spans, key=lambda s: s[0], reverse=True):
-        if candidates:
-            text = text[:start] + rng.choice(candidates) + text[end:]
+    replacements: dict[tuple[str, str], str] = {}
+    for start, end, kind, candidates in sorted(spans, key=lambda s: s[0], reverse=True):
+        if not candidates:
+            continue
+        key = (kind, text[start:end].lower())
+        if key not in replacements:
+            replacements[key] = rng.choice(candidates)
+        text = text[:start] + replacements[key] + text[end:]
     return text
 
 
@@ -517,7 +546,7 @@ def generate_rules_text(
     rng = rng or random
     if not pool.shape_counts:
         return []
-    if not force and rng.random() >= EXTRA_TEXT_CHANCE:
+    if not force and rng.random() >= pool.extra_text_chance:
         return []
 
     # Pick one shape (trigger / activated / static -- see corpus.py's
@@ -534,13 +563,16 @@ def generate_rules_text(
         # continuation clause instead of an unrelated second opener.
         heads = _pick(pool.heads, shape, position)
         tails = _pick(pool.tails, shape, position)
-        if heads and tails and rng.random() < RECOMBINE_CHANCE:
+        sentences = _pick(pool.sentences, shape, position)
+        recombine_chance = (
+            SPARSE_RECOMBINE_CHANCE if len(sentences) < SPARSE_VERBATIM_THRESHOLD else RECOMBINE_CHANCE
+        )
+        if heads and tails and rng.random() < recombine_chance:
             sentence = rng.choice(heads) + rng.choice(tails)
-        else:
-            sentences = _pick(pool.sentences, shape, position)
-            if not sentences:
-                continue
+        elif sentences:
             sentence = rng.choice(sentences)
+        else:
+            continue
         sentence = _reroll_line(sentence, pool, vocab, rng)
         lines.append(sentence.replace("~", card_name))
 

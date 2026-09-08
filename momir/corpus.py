@@ -261,6 +261,17 @@ class Corpus:
         default_factory=lambda: defaultdict(list)
     )
 
+    # cmc -> count of creatures at that cmc that printed any rules text beyond
+    # a bare keyword line (i.e. contributed at least one entry to
+    # sentences_by_cmc), paired with extra_text_totals_by_cmc below for the
+    # real per-cmc "has extra text" rate momir/text.py samples from instead
+    # of a flat constant -- same "sample the real distribution" approach as
+    # every other per-cmc stat here. See extra_text_rate.
+    extra_text_hits_by_cmc: Counter = field(default_factory=Counter)
+    # cmc -> count of every creature considered at that cmc, whether or not
+    # it had any rules text -- the denominator for extra_text_hits_by_cmc.
+    extra_text_totals_by_cmc: Counter = field(default_factory=Counter)
+
     # cmc -> list of raw mana_cost strings actually used at that cmc
     mana_costs_by_cmc: dict[int, list[str]] = field(default_factory=lambda: defaultdict(list))
 
@@ -324,6 +335,28 @@ def nearest_cmc(buckets: dict[int, object], mana_value: int) -> int | None:
     if not available:
         return None
     return min(available, key=lambda cmc: (abs(cmc - mana_value), cmc))
+
+
+def extra_text_rate(corpus: Corpus, mana_value: int) -> float:
+    """Real fraction of creatures at (or, if that cmc has no samples, the
+    nearest one that does -- see nearest_cmc) mana_value that print rules
+    text beyond a bare keyword line. See extra_text_hits_by_cmc /
+    extra_text_totals_by_cmc and momir/text.py's generate_rules_text."""
+    cmc = mana_value if corpus.extra_text_totals_by_cmc.get(mana_value) else nearest_cmc(
+        corpus.extra_text_totals_by_cmc, mana_value
+    )
+    if cmc is None:
+        return 0.0
+    return corpus.extra_text_hits_by_cmc[cmc] / corpus.extra_text_totals_by_cmc[cmc]
+
+
+def overall_extra_text_rate(corpus: Corpus) -> float:
+    """Same as extra_text_rate but pooled across every mana value -- for
+    mayhem's sentence pool, which already ignores mana value entirely."""
+    total = sum(corpus.extra_text_totals_by_cmc.values())
+    if not total:
+        return 0.0
+    return sum(corpus.extra_text_hits_by_cmc.values()) / total
 
 
 def subtype_pool(corpus: Corpus, mana_value: int, mayhem: bool = False, weighted: bool = True) -> Counter:
@@ -710,6 +743,9 @@ def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = Non
             corpus.sentences_by_cmc[cmc].append((sentence, min(position, MAX_SENTENCE_POSITION), shape))
         for compound, position, shape in compounds:
             corpus.compound_sentences_by_cmc[cmc].append((compound, min(position, MAX_SENTENCE_POSITION), shape))
+        corpus.extra_text_totals_by_cmc[cmc] += 1
+        if sentences:
+            corpus.extra_text_hits_by_cmc[cmc] += 1
 
         mana_cost = card.get("mana_cost")
         if mana_cost:
