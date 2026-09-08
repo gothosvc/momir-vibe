@@ -117,17 +117,68 @@ def _keyword_occurrence(oracle_text: str, keyword: str, name: str = "") -> str |
     _is_template_fragment -- rather than across the whole text at once, so a
     keyword that happens to also appear inside e.g. a Choose-one bullet or a
     granted-ability's quoted sub-text on this card doesn't have that
-    fragment's mismatched context captured as its value."""
+    fragment's mismatched context captured as its value.
+
+    Only "static"-shaped lines are searched (see _sentence_shape): Scryfall's
+    keywords list mixes real keyword *abilities*, always printed as their own
+    bare/comma-separated header line ("Flying", "Ward {2}"), with keyword
+    *actions* like Fight or Destroy, which only ever appear as a verb inside
+    a full trigger/activated sentence ("When this creature enters, it fights
+    target creature you don't control."). Matching a keyword action there
+    would capture the rest of that sentence as its "value" and print it back
+    as a nonsensical standalone header.
+
+    That "static" test isn't airtight -- an ability word's intro dash or a
+    leading "As ~ enters," both read as static (no trigger prefix, no colon)
+    while still smuggling in a full trigger clause after them ("As this
+    creature enters, mill three cards for each time it was kicked.").
+    _value_looks_leaked catches what falls through: a real value is either a
+    bare cost/number/color-list ("{2}", "2", "from red"), or a clause
+    introduced by its own dash ("Ward—Discard a card at random", "Prototype
+    {2}{G}{G} — 3/3"); anything else containing a stray pronoun or
+    "target"/"control" is the tail of a sentence the keyword just happened
+    to sit inside, not its value.
+    """
     for line in _REMINDER_TEXT_RE.sub("", oracle_text).split("\n"):
         line = line.strip()
         if not line or _is_template_fragment(line) or '"' in line:
             continue
+        if _sentence_shape(line) != "static":
+            continue
         if name:
             line = _normalize_self_references(line, name)
         match = re.search(rf"\b{re.escape(keyword)}\b([^,.;]*)", line, re.IGNORECASE)
-        if match:
-            return match.group(1).rstrip()
+        if not match:
+            continue
+        value = match.group(1).rstrip()
+        if _value_looks_leaked(value, keyword):
+            continue
+        return value
     return None
+
+
+# Real keyword-value suffixes are always one of: bare (""), a cost/number
+# ("{2}", " 2"), a color/type list ("from red", "with Gorm the Great" --
+# "Hexproof from"/"Partner with" already end in the preposition, so their
+# own value starts straight into the list), or a clause introduced by its
+# own dash ("—Discard a card at random", " {2}{G}{G} — 3/3"). A value
+# that's none of those but still contains a pronoun or "target"/"control" is
+# a full sentence's tail that leaked past the "static" line filter above,
+# not a real printed value -- see _keyword_occurrence.
+_LEAKED_CLAUSE_RE = re.compile(
+    r"\btarget\b|\bcontrols?\b|\brather than\b|\binstead\b|\bthis\b|\beach\b|\bits?\b"
+    r"|\bthem\b|\btheir\b|\bthey\b|\byou\b|\byour\b",
+    re.IGNORECASE,
+)
+
+
+def _value_looks_leaked(value: str, keyword: str) -> bool:
+    if not value or value.startswith(("-", "—")):
+        return False
+    stripped = value.lstrip()
+    if stripped.startswith(("from ", "with ")) or keyword.endswith(("from", "with")):
+        return False
+    return bool(_LEAKED_CLAUSE_RE.search(value))
 
 
 # An ability word's captured "value" is really a clause introduction, not a

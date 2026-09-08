@@ -5,9 +5,9 @@ A vibe-coded Magic: The Gathering creature card generator, built for Momir-style
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: Magus of the Heavens, a 2-mana white Goblin Gremlin with Changeling and two triggered abilities">
-  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Minion of the Scorpion, a 6-mana white Processor with a fight-target activated ability and an evasion restriction">
-  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Zirit, an 11-mana colorless Angel with Indestructible, a graveyard-recursion trigger, and a board-wipe trigger">
+  <img src="docs/screenshots/card-1.png" width="260" alt="Generated card: White Orchid, a 2-mana black Wizard Lord with a sacrifice-to-regenerate activated ability">
+  <img src="docs/screenshots/card-2.png" width="260" alt="Generated card: Disciple of Perdition, a 6-mana white Eldrazi God with Reach and a death-triggered ability">
+  <img src="docs/screenshots/card-3.png" width="260" alt="Generated card: Wall of Vipers, an 11-mana colorless Golem with Reach and two sacrifice-based activated abilities">
 </p>
 
 Three cards generated at different mana values from the mockup page in `static/` — real art, on-curve stats, and generated rules text, none of it copied from any single real card.
@@ -15,7 +15,7 @@ Three cards generated at different mana values from the mockup page in `static/`
 There's also a black & white, card-shaped PNG meant for "printer" Momir Vig setups that pull a random card *image* rather than JSON:
 
 <p>
-  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Ramiteer, a 5-mana Elemental with Investigate twice, Trample, a combat-damage creature-steal trigger, and a token-creating enter trigger, rendered as a dithered card-shaped PNG">
+  <img src="docs/screenshots/printable-card.png" width="260" alt="Printable B&amp;W card image: Nessian Game Warden, a 5-mana blue Dragon with Horsemanship and a Landfall trigger, rendered as a dithered card-shaped PNG">
 </p>
 
 ## How it works
