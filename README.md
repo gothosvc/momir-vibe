@@ -42,8 +42,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # One-time (or occasional) fetch of real creature card data to train on.
-# Writes data/cards_cache.json (~6-7 MB), gitignored.
-python -m data.fetch_cards
+# Writes data/cards_cache.json (~9 MB), gitignored.
+python -m data.fetch_cards           # full pool, via Scryfall's oracle_cards bulk data (one file, no pagination)
 python -m data.fetch_cards --set woe  # or just top up one set by name, instead of a full refetch
 ```
 
@@ -85,7 +85,7 @@ curl "http://127.0.0.1:8000/cards/generate?mana_value=3"
 ## Project layout
 
 ```
-data/fetch_cards.py    one-time Scryfall fetch -> data/cards_cache.json
+data/fetch_cards.py    Scryfall bulk-data fetch (or --set for one set via search) -> data/cards_cache.json
 momir/corpus.py         loads the cache, builds training indices
 momir/markov.py         the generic Markov chain implementations
 momir/card_builder.py   ties every piece above into a Card

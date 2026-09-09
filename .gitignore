@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 data/cards_cache.json
+data/*.jsonl.gz
 .DS_Store
 .claude/settings.local.json
 todo.txt

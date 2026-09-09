@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import pathlib
 import time
@@ -19,6 +20,14 @@ import requests
 
 CACHE_PATH = pathlib.Path(__file__).parent / "cards_cache.json"
 SEARCH_URL = "https://api.scryfall.com/cards/search"
+BULK_DATA_URL = "https://api.scryfall.com/bulk-data/oracle_cards"
+
+# /cards/search excludes these by default (Scryfall's "extras") but the
+# bulk-data export does not. Tokens hide under all sorts of set_types
+# (masters, box, promo, not just set_type:token itself), so `layout` is the
+# reliable signal, not set_type -- tokens have blank mana costs and generic
+# names ("Soldier", "Demon") that would pollute training.
+EXTRA_LAYOUTS = {"token", "double_faced_token"}
 
 # Scryfall rejects requests with a generic/default User-Agent (see
 # https://scryfall.com/docs/api). Identify ourselves as their guidelines ask.
@@ -78,6 +87,50 @@ def _get_with_retry(url: str, params: dict | None) -> dict:
     raise RuntimeError("unreachable")  # loop always returns or raises
 
 
+def _trim_card(raw: dict) -> dict | None:
+    # Skip double-faced/split cards' front-only weirdness and cards missing
+    # the fields we need to train on.
+    if "power" not in raw or "toughness" not in raw:
+        return None
+    trimmed = {k: raw.get(k) for k in KEEP_FIELDS}
+    # The art box alone (no card frame), for momir/art.py to hand back as a
+    # generated card's picture -- see corpus.py's art_by_colors/all_art. The
+    # only other image_uris entries are full-card renders we have no use
+    # for, so this one field is pulled out individually rather than adding
+    # all of image_uris.
+    trimmed["art_crop_url"] = (raw.get("image_uris") or {}).get("art_crop")
+    legalities = raw.get("legalities") or {}
+    trimmed["legal_formats"] = [fmt for fmt in TRACKED_FORMATS if legalities.get(fmt) == "legal"]
+    return trimmed
+
+
+def fetch_bulk() -> list[dict]:
+    """Full-pool fetch via Scryfall's bulk-data export: one file, no paging
+    or rate limiting to manage. Used for the default (no --set) fetch; the
+    per-set incremental fetch below still uses the search API since bulk
+    data has no server-side set filter and downloading the whole file just
+    to pull one set out of it would be wasteful."""
+    bulk_info = _get_with_retry(BULK_DATA_URL, None)
+    resp = requests.get(bulk_info["jsonl_download_uri"], headers=HEADERS, timeout=120)
+    resp.raise_for_status()
+
+    cards = []
+    for line in gzip.decompress(resp.content).splitlines():
+        if not line:
+            continue
+        raw = json.loads(line)
+        if "Creature" not in (raw.get("type_line") or ""):
+            continue
+        if raw.get("set_type") == "funny" or raw.get("layout") in EXTRA_LAYOUTS:
+            continue
+        if "paper" not in (raw.get("games") or []):
+            continue
+        trimmed = _trim_card(raw)
+        if trimmed is not None:
+            cards.append(trimmed)
+    return cards
+
+
 def fetch_all(max_cards: int | None = None, query: str = QUERY) -> list[dict]:
     cards: list[dict] = []
     url = SEARCH_URL
@@ -92,20 +145,9 @@ def fetch_all(max_cards: int | None = None, query: str = QUERY) -> list[dict]:
             raise
 
         for raw in payload.get("data", []):
-            # Skip double-faced/split cards' front-only weirdness and cards
-            # missing the fields we need to train on.
-            if "power" not in raw or "toughness" not in raw:
-                continue
-            trimmed = {k: raw.get(k) for k in KEEP_FIELDS}
-            # The art box alone (no card frame), for momir/art.py to hand
-            # back as a generated card's picture -- see corpus.py's
-            # art_by_colors/all_art. The only other image_uris entries are
-            # full-card renders we have no use for, so this one field is
-            # pulled out individually rather than adding all of image_uris.
-            trimmed["art_crop_url"] = (raw.get("image_uris") or {}).get("art_crop")
-            legalities = raw.get("legalities") or {}
-            trimmed["legal_formats"] = [fmt for fmt in TRACKED_FORMATS if legalities.get(fmt) == "legal"]
-            cards.append(trimmed)
+            trimmed = _trim_card(raw)
+            if trimmed is not None:
+                cards.append(trimmed)
 
         if max_cards is not None and len(cards) >= max_cards:
             cards = cards[:max_cards]
@@ -135,9 +177,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    query = f"{QUERY} set:{args.set}" if args.set else QUERY
-    print(f"Fetching creature cards from Scryfall ({query!r})...")
-    fetched = fetch_all(query=query)
+    if args.set:
+        query = f"{QUERY} set:{args.set}"
+        print(f"Fetching creature cards from Scryfall ({query!r})...")
+        fetched = fetch_all(query=query)
+    else:
+        print("Fetching creature cards from Scryfall's oracle_cards bulk data...")
+        fetched = fetch_bulk()
     print(f"Fetched {len(fetched)} unique creature cards.")
 
     if args.set and CACHE_PATH.exists():
