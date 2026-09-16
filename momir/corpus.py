@@ -475,29 +475,50 @@ def has_ungrounded_x(sentence: str, shape: str) -> bool:
     return True
 
 
-# "Choose target X" sets up a choice without saying what happens to it --
-# real oracle text almost always pays that off in a *separate* sentence
-# ("...choose target creature. It gets -3/-3 until end of turn."), which
-# training samples independently by position (see momir/text.py's
+# "Choose target X" (or "choose an opponent"/"choose a color"/"choose a
+# creature type"/... -- any object, not just "target") sets up a choice
+# without saying what happens to it -- real oracle text almost always pays
+# that off in a *separate* sentence ("...choose target creature. It gets
+# -3/-3 until end of turn." / "...choose an opponent. That player..."),
+# which training samples independently by position (see momir/text.py's
 # SentencePool) and isn't guaranteed to travel with the sentence that set it
-# up. Isolated, "choose target artifact card in your graveyard." reads as a
-# choice with no consequence. Grounded only when the same sentence pays it
-# off itself ("choose target creature, then it gets -3/-3."); everything
-# else is presumed to lean on a follow-up sentence this generator can't
-# guarantee, same treatment as has_ungrounded_x above.
-_CHOOSE_TARGET_RE = re.compile(r"\bchoose\b[^.!?]*\btarget\b", re.IGNORECASE)
-_CHOOSE_RESOLVED_RE = re.compile(r"\bthen\b", re.IGNORECASE)
+# up. Isolated, "choose target artifact card in your graveyard." or "choose
+# an opponent." reads as a choice with no consequence. Grounded only when
+# the same sentence pays it off itself ("choose target creature, then it
+# gets -3/-3.", or a later "the chosen ..." reference in the same
+# sentence); everything else is presumed to lean on a follow-up sentence
+# this generator can't guarantee, same treatment as has_ungrounded_x above.
+_CHOOSE_RE = re.compile(r"\b(?:choose|chooses|choosing|chose)\b", re.IGNORECASE)
+_CHOOSE_RESOLVED_RE = re.compile(r"\bthen\b|\bchosen\b", re.IGNORECASE)
 
 
 def has_dangling_choice(sentence: str) -> bool:
-    """True if `sentence` sets up a "choose target ..." choice that isn't
-    resolved within itself -- see the comment above. A sentence failing this
-    check is excluded from sentences_by_cmc entirely, same as
-    has_ungrounded_x."""
-    match = _CHOOSE_TARGET_RE.search(sentence)
+    """True if `sentence` sets up a "choose ..." choice that isn't resolved
+    within itself -- see the comment above. A sentence failing this check is
+    excluded from sentences_by_cmc entirely, same as has_ungrounded_x."""
+    match = _CHOOSE_RE.search(sentence)
     if not match:
         return False
     return not _CHOOSE_RESOLVED_RE.search(sentence[match.end():])
+
+
+# The mirror problem: "the chosen color"/"the chosen type"/"the chosen
+# player" (etc.) pays off a choice posed in a separate "choose ..." sentence
+# -- same unguaranteed pairing problem as the setup half above, just from
+# the other side ("Spells of the chosen type cost {1} more to cast." reads
+# as nonsense with no chosen type ever established). Grounded only when the
+# same sentence also poses the choice itself.
+_CHOSEN_REFERENCE_RE = re.compile(r"\bchosen\b", re.IGNORECASE)
+
+
+def has_dangling_chosen_reference(sentence: str) -> bool:
+    """True if `sentence` references a "the chosen ..." choice without
+    posing that choice itself -- see the comment above. A sentence failing
+    this check is excluded from sentences_by_cmc entirely, same as
+    has_ungrounded_x."""
+    if not _CHOSEN_REFERENCE_RE.search(sentence):
+        return False
+    return not _CHOOSE_RE.search(sentence)
 
 
 # "This mana" always refers back to a specific "Add ..." mana ability
@@ -641,6 +662,7 @@ def _extract_sentences(
             if (
                 not has_ungrounded_x(line, compound_shape)
                 and not has_dangling_choice(line)
+                and not has_dangling_chosen_reference(line)
                 and not has_dangling_mana_reference(line)
                 and not has_dangling_die_roll(line)
                 and not has_dangling_pay(line)
@@ -666,18 +688,20 @@ def _extract_sentences(
             # entirely) -- word-splicing has no way to keep them balanced,
             # so quoted sentences are dropped rather than left to produce
             # stray dangling quote marks. Sentences with an ungrounded bare
-            # "X", a dangling "choose target", a dangling "this mana", a
-            # dangling die roll, a dangling "you may pay", or a dangling "if
-            # you do" are dropped for the same reason -- see has_ungrounded_x
-            # / has_dangling_choice / has_dangling_mana_reference /
-            # has_dangling_die_roll / has_dangling_pay /
-            # has_dangling_if_you_do.
+            # "X", a dangling "choose", a dangling "the chosen ..."
+            # reference, a dangling "this mana", a dangling die roll, a
+            # dangling "you may pay", or a dangling "if you do" are dropped
+            # for the same reason -- see has_ungrounded_x /
+            # has_dangling_choice / has_dangling_chosen_reference /
+            # has_dangling_mana_reference / has_dangling_die_roll /
+            # has_dangling_pay / has_dangling_if_you_do.
             shape = _sentence_shape(sentence)
             if (
                 sentence.endswith((".", "!", "?"))
                 and '"' not in sentence
                 and not has_ungrounded_x(sentence, shape)
                 and not has_dangling_choice(sentence)
+                and not has_dangling_chosen_reference(sentence)
                 and not has_dangling_mana_reference(sentence)
                 and not has_dangling_die_roll(sentence)
                 and not has_dangling_pay(sentence)
