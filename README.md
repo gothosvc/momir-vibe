@@ -1,6 +1,6 @@
 # Momir Vibe
 
-A vibe-coded Magic: The Gathering creature card generator, built for Momir-style play. Give it a mana value, get back a randomly-generated, fully-statted creature card that doesn't exist.
+A vibe-coded Magic: The Gathering creature card generator, built for Momir-style play. Give it a mana value, get back a randomly-generated, fully-statted creature card that doesn't exist. Packaged as a standalone program exposing a small REST API, with a thin (optional) UI for visualizing generated cards.
 
 ## Screenshots
 
