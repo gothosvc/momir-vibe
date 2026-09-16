@@ -608,6 +608,28 @@ def has_dangling_if_you_do(sentence: str) -> bool:
     return not _YOU_MAY_RE.search(sentence)
 
 
+# A restriction/modifier on an activated ability ("Activate only as a
+# sorcery.", "Activate no more than twice each turn.", "Any player may
+# activate this ability.") always trails the activated-ability sentence it
+# restricts -- it names no cost or effect of its own, so alone it reads as a
+# nonsensical standalone rules-text line. Real activated-ability sentences
+# always carry their own colon (see _sentence_shape), so checking shape
+# tells an actual ability apart from a bare restriction on one.
+_DANGLING_ACTIVATION_RESTRICTION_RE = re.compile(
+    r"^(?:activate\b|any player may activate this ability\b)", re.IGNORECASE
+)
+
+
+def has_dangling_activation_restriction(sentence: str, shape: str) -> bool:
+    """True if `sentence` restricts/modifies an activated ability named
+    earlier in the same paragraph rather than defining one itself -- see the
+    comment above. A sentence failing this check is excluded from
+    sentences_by_cmc entirely, same as has_ungrounded_x -- it's still
+    available whole via compounds, paired with the ability sentence it
+    restricts."""
+    return shape != "activated" and bool(_DANGLING_ACTIVATION_RESTRICTION_RE.match(sentence))
+
+
 def _extract_sentences(
     oracle_text: str | None, name: str = ""
 ) -> tuple[list[tuple[str, int, str]], list[tuple[str, int, str]]]:
@@ -690,11 +712,12 @@ def _extract_sentences(
             # stray dangling quote marks. Sentences with an ungrounded bare
             # "X", a dangling "choose", a dangling "the chosen ..."
             # reference, a dangling "this mana", a dangling die roll, a
-            # dangling "you may pay", or a dangling "if you do" are dropped
-            # for the same reason -- see has_ungrounded_x /
-            # has_dangling_choice / has_dangling_chosen_reference /
-            # has_dangling_mana_reference / has_dangling_die_roll /
-            # has_dangling_pay / has_dangling_if_you_do.
+            # dangling "you may pay", a dangling "if you do", or a dangling
+            # activation restriction are dropped for the same reason -- see
+            # has_ungrounded_x / has_dangling_choice /
+            # has_dangling_chosen_reference / has_dangling_mana_reference /
+            # has_dangling_die_roll / has_dangling_pay /
+            # has_dangling_if_you_do / has_dangling_activation_restriction.
             shape = _sentence_shape(sentence)
             if (
                 sentence.endswith((".", "!", "?"))
@@ -706,6 +729,7 @@ def _extract_sentences(
                 and not has_dangling_die_roll(sentence)
                 and not has_dangling_pay(sentence)
                 and not has_dangling_if_you_do(sentence)
+                and not has_dangling_activation_restriction(sentence, shape)
             ):
                 sentences.append((sentence, position, shape))
             position += 1

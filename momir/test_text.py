@@ -12,7 +12,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 
-from .corpus import Corpus
+from .corpus import Corpus, _extract_sentences
 from .text import (
     RerollVocab,
     _extract_number_spans,
@@ -114,6 +114,12 @@ def main() -> None:
         assert COMPOUND_TRIGGER not in pool.tails.get((shape, 0), []), "a compound must never become a tail"
         assert COMPOUND_ACTIVATED not in pool.heads.get((shape, 0), []), "a compound must never become a head"
         assert COMPOUND_ACTIVATED not in pool.tails.get((shape, 0), []), "a compound must never become a tail"
+
+    solo_sentences, solo_compounds = _extract_sentences(COMPOUND_ACTIVATED, CARD_NAME)
+    assert "Activate only once each turn." not in [s for s, _, _ in solo_sentences], (
+        "an activation restriction must never be sampled standalone -- only whole, paired with the ability it restricts"
+    )
+    assert solo_compounds[0][0] == COMPOUND_ACTIVATED, "the whole paragraph must still be captured as a compound"
 
     known_texts = set(TRIGGER_SENTENCES + ACTIVATED_SENTENCES + STATIC_SENTENCES) | {
         head + tail
