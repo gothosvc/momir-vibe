@@ -537,12 +537,15 @@ def rules_text_defines_pt(rules_text: list[str], card_name: str) -> tuple[bool, 
     toughness are each equal to ..." characteristic-defining clause -- if so
     the printed stat should show "*" instead of the sampled number, same as
     the real card would (e.g. Tarmogoyf, Adeline, An-Havva Constable).
-    Checked against both the card's own name and "this creature", the two
-    ways real oracle text self-references (see corpus.py's
+    Checked against the card's own name, "this creature", and "its" (the
+    third is how a second clause in the same compound sentence refers back
+    to a subject already named earlier in it, e.g. Tarmogoyf's "~'s power is
+    equal to ... and its toughness is equal to that number plus 1") -- the
+    three ways real oracle text self-references (see corpus.py's
     _normalize_self_references)."""
-    subject = f"{re.escape(card_name)}|this creature"
+    subject = f"(?:{re.escape(card_name)}|this creature)'s|its"
     pattern = re.compile(
-        rf"(?:{subject})'s (power(?: and toughness)?|toughness(?: and power)?)\s+(?:is|are)\s+(?:each\s+)?equal to",
+        rf"(?:{subject}) (power(?: and toughness)?|toughness(?: and power)?)\s+(?:is|are)\s+(?:each\s+)?equal to",
         re.IGNORECASE,
     )
     power = toughness = False

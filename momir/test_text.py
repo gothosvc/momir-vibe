@@ -172,6 +172,10 @@ def main() -> None:
     ), "must not fire for a different creature's name"
     assert rules_text_defines_pt(["This creature's power and toughness are each equal to X."], CARD_NAME) == (True, True)
     assert rules_text_defines_pt(["Test Creature gets +1/+1 until end of turn."], CARD_NAME) == (False, False)
+    assert rules_text_defines_pt(
+        [f"{CARD_NAME}'s power is equal to the number of creature cards in all graveyards and its toughness is equal to that number plus 1."],
+        CARD_NAME,
+    ) == (True, True), "Tarmogoyf-style compound clause must flag both halves, not just the power half"
 
     empty_corpus = Corpus(raw_cards=[])
     empty_vocab = build_reroll_vocab(empty_corpus)
