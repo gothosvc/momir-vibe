@@ -388,7 +388,7 @@ def _numeric(value) -> float | None:
         return None
 
 
-def _extract_subtypes(type_line: str) -> list[str]:
+def extract_subtypes(type_line: str) -> list[str]:
     # Split/adventure cards ("Creature — Giant // Sorcery — Adventure") carry
     # both faces' type lines in one string -- without this, partitioning on
     # the first em dash pulls in the *second* face's " // Sorcery —
@@ -782,7 +782,7 @@ def build_corpus(raw_cards: list[dict] | None = None, legal_in: str | None = Non
         if power is not None and toughness is not None:
             corpus.pt_by_cmc[cmc].append((power, toughness))
 
-        for subtype in _extract_subtypes(card.get("type_line", "")):
+        for subtype in extract_subtypes(card.get("type_line", "")):
             corpus.subtypes_by_cmc[cmc][subtype] += 1
 
         for keyword in card.get("keywords") or []:

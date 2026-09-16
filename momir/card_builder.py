@@ -13,7 +13,7 @@ import random
 from typing import Literal
 
 from . import art, colors, stats, text, types
-from .corpus import Corpus, get_corpus
+from .corpus import Corpus, extract_subtypes, get_corpus
 from .models import Card
 from .names import NameChains, build_name_chains, generate_name
 
@@ -81,7 +81,10 @@ class CardGenerator:
         )
         keywords = text.generate_keywords(self.corpus, mana_value, name, rng=rng, mayhem=text_mayhem)
         pool = self.mayhem_sentence_pool if text_mayhem else self.sentence_pools[mana_value]
-        rules_text = text.generate_rules_text(pool, name, rng=rng, vocab=self.reroll_vocab, force=force_text)
+        own_subtypes = extract_subtypes(type_line)
+        rules_text = text.generate_rules_text(
+            pool, name, rng=rng, vocab=self.reroll_vocab, force=force_text, own_subtypes=own_subtypes
+        )
         power_defined, toughness_defined = text.rules_text_defines_pt(rules_text, name)
         power = "*" if power_defined else power
         toughness = "*" if toughness_defined else toughness

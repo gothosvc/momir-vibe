@@ -477,7 +477,21 @@ def _pick(bucket: dict[tuple[str, int], list[str]], shape: str, position: int) -
     return bucket.get((shape, position)) or bucket.get((shape, 0)) or []
 
 
-def _reroll_line(text: str, pool: SentencePool, vocab: RerollVocab | None, rng: random.Random) -> str:
+# "this creature or another Elf you control", "Other Goblins you control get
+# +1/+1" -- a real tribal payoff's "another"/"other X" always names the
+# card's own subtype, not an arbitrary one. Detected as a lookbehind so the
+# reroll can swap in one of *this* card's own generated subtypes there
+# instead of an unrelated one drawn from the generic pool.
+_TRIBAL_QUALIFIER_RE = re.compile(r"\b(?:another|other)\s+$", re.IGNORECASE)
+
+
+def _reroll_line(
+    text: str,
+    pool: SentencePool,
+    vocab: RerollVocab | None,
+    rng: random.Random,
+    own_subtypes: list[str] | None = None,
+) -> str:
     """Reroll every detected numeric/keyword/subtype slot in `text` for a
     different real value drawn from the matching pool -- a no-op for a slot
     whose pool is empty, or one that happens to redraw what was already
@@ -501,7 +515,11 @@ def _reroll_line(text: str, pool: SentencePool, vocab: RerollVocab | None, rng: 
             # qualifying word before it ("has flying"), which stays put.
             spans += [(m.start(1), m.end(1), "keyword", pool.keyword_refs) for m in vocab.keyword_re.finditer(text)]
         if vocab.subtype_re is not None:
-            spans += [(m.start(), m.end(), "subtype", pool.subtype_refs) for m in vocab.subtype_re.finditer(text)]
+            for m in vocab.subtype_re.finditer(text):
+                candidates = pool.subtype_refs
+                if own_subtypes and _TRIBAL_QUALIFIER_RE.search(text[: m.start()]):
+                    candidates = own_subtypes
+                spans.append((m.start(), m.end(), "subtype", candidates))
 
     replacements: dict[tuple[str, str], str] = {}
     for start, end, kind, candidates in sorted(spans, key=lambda s: s[0], reverse=True):
@@ -542,6 +560,7 @@ def generate_rules_text(
     rng: random.Random | None = None,
     vocab: RerollVocab | None = None,
     force: bool = False,
+    own_subtypes: list[str] | None = None,
 ) -> list[str]:
     rng = rng or random
     if not pool.shape_counts:
@@ -573,7 +592,7 @@ def generate_rules_text(
             sentence = rng.choice(sentences)
         else:
             continue
-        sentence = _reroll_line(sentence, pool, vocab, rng)
+        sentence = _reroll_line(sentence, pool, vocab, rng, own_subtypes)
         lines.append(sentence.replace("~", card_name))
 
     # position 0/1 can both come up empty if the chosen shape happens to have
@@ -583,6 +602,6 @@ def generate_rules_text(
     if force and not lines:
         fallback = [sentence for bucket in pool.sentences.values() for sentence in bucket]
         if fallback:
-            sentence = _reroll_line(rng.choice(fallback), pool, vocab, rng)
+            sentence = _reroll_line(rng.choice(fallback), pool, vocab, rng, own_subtypes)
             lines.append(sentence.replace("~", card_name))
     return lines
