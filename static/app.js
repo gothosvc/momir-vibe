@@ -10,17 +10,42 @@ function frameClass(colors) {
   return COLOR_TO_FRAME_CLASS[colors[0]] || "colorless";
 }
 
-function pipClass(symbol) {
-  if (/^[WUBRG]$/.test(symbol)) return `pip-${symbol.toLowerCase()}`;
-  if (/^(\d+|X)$/.test(symbol)) return "pip-generic";
-  return "pip-hybrid"; // hybrid (W/U) or Phyrexian (B/P) mana
+const TAP_ARROW =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 13V7.5a4 4 0 0 1 8 0V9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M8.6 8.6h6.8L12 12.6z" fill="currentColor"/></svg>';
+const PIP_LABELS = { T: "tap", Q: "untap" };
+
+// Halves of a split symbol ({W/U}, {2/R}, {B/P}, {C/G}) each map to a pip
+// color; a half with no color of its own (a number, P for Phyrexian) is
+// shown as the pip's text instead.
+function pipColor(part) {
+  if (/^[WUBRG]$/.test(part)) return `var(--pip-${part.toLowerCase()})`;
+  if (/^(\d+|X|C)$/.test(part)) return "var(--pip-generic)";
+  return null;
+}
+
+function renderPip(symbol, extraClass = "") {
+  const cls = `pip ${extraClass}`.trim();
+  if (symbol === "T" || symbol === "Q") {
+    return `<span class="${cls} pip-${symbol.toLowerCase()}" role="img" aria-label="${PIP_LABELS[symbol]}">${TAP_ARROW}</span>`;
+  }
+  if (/^[WUBRG]$/.test(symbol)) {
+    return `<span class="${cls} pip-${symbol.toLowerCase()}">${symbol}</span>`;
+  }
+  const parts = symbol.split("/");
+  const colors = parts.map(pipColor).filter(Boolean);
+  const label = parts
+    .filter((part) => !/^[WUBRGC]$/.test(part))
+    .map((part) => (part === "P" ? "Φ" : part))
+    .join("");
+  if (parts.length > 1 && colors.length >= 2) {
+    return `<span class="${cls} pip-split" style="--a: ${colors[0]}; --b: ${colors[1]}" title="{${escapeHtml(symbol)}}">${escapeHtml(label)}</span>`;
+  }
+  const bg = colors[0] ?? "var(--pip-generic)";
+  return `<span class="${cls}" style="background: ${bg}" title="{${escapeHtml(symbol)}}">${escapeHtml(label || symbol)}</span>`;
 }
 
 function renderManaCost(manaCost) {
-  const symbols = [...manaCost.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
-  return symbols
-    .map((sym) => `<span class="pip ${pipClass(sym)}">${sym}</span>`)
-    .join("");
+  return [...manaCost.matchAll(/\{([^}]+)\}/g)].map((m) => renderPip(m[1])).join("");
 }
 
 const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;" };
@@ -37,7 +62,7 @@ function renderTextWithMana(text) {
     .map((part) => {
       const m = part.match(/^\{([^}]+)\}$/);
       return m
-        ? `<span class="pip pip-inline ${pipClass(m[1])}">${m[1]}</span>`
+        ? renderPip(m[1], "pip-inline")
         : escapeHtml(part);
     })
     .join("");

@@ -4,6 +4,13 @@
   --muted: #9a978f;
   --accent: #c9a24b;
 
+  --pip-w: #f8f4e3;
+  --pip-u: #6ea3d8;
+  --pip-b: #8a7f8a;
+  --pip-r: #e79a7c;
+  --pip-g: #8fbf8f;
+  --pip-generic: #d8d2c2;
+
   /* MTG-ish frame colors, one custom property set per card color so the
      card frame just switches palettes via a class -- see .card.<color>. */
   --frame-border: #000;
@@ -683,13 +690,24 @@ main {
   margin: 0 0.05em;
 }
 
-.pip-w { background: #f8f4e3; }
-.pip-u { background: #6ea3d8; }
-.pip-b { background: #8a7f8a; }
-.pip-r { background: #e79a7c; }
-.pip-g { background: #8fbf8f; }
-.pip-generic { background: #d8d2c2; }
-.pip-hybrid { background: linear-gradient(90deg, #f8f4e3, #6ea3d8); }
+.pip-w { background: var(--pip-w); }
+.pip-u { background: var(--pip-u); }
+.pip-b { background: var(--pip-b); }
+.pip-r { background: var(--pip-r); }
+.pip-g { background: var(--pip-g); }
+.pip-generic,
+.pip-t { background: var(--pip-generic); }
+.pip-q { background: #14110c; color: var(--pip-generic); }
+.pip-split { background: linear-gradient(135deg, var(--a) 50%, var(--b) 50%); }
+
+.pip svg {
+  width: 72%;
+  height: 72%;
+}
+
+.pip-q svg {
+  transform: scaleX(-1);
+}
 
 .card-art {
   /* Scryfall art_crop images aren't a fixed size, so this starts as a
