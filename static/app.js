@@ -101,6 +101,9 @@ function populateCard(root, card, extraClass = "") {
     `${escapeHtml(card.set_name)} #${escapeHtml(card.collector_number)} • ${escapeHtml(card.artist)}`;
 }
 
+// Max tilt in degrees per mayhem level -- wilder settings land messier.
+const TILT = { off: 3, text: 4, full: 6, unhinged: 9 };
+
 function renderCard(card, { animateSettle = false } = {}) {
   const el = document.getElementById("card");
   populateCard(el, card);
@@ -108,9 +111,9 @@ function renderCard(card, { animateSettle = false } = {}) {
   // onto the table -- animateSettle (only set by a fresh Generate or a
   // promoted stack card, see generate()/promoteFromStack() below)
   // additionally plays the settle-bounce animation.
-  el.style.setProperty("--rot", `${(Math.random() * 6 - 3).toFixed(1)}deg`);
+  const tilt = TILT[card._genParams?.mayhem] ?? TILT.off;
+  el.style.setProperty("--rot", `${((Math.random() * 2 - 1) * tilt).toFixed(1)}deg`);
   if (animateSettle) el.classList.add("settling");
-  el.hidden = false;
 }
 
 // Cards generated earlier this session, most-recent-first, rendered as a
@@ -158,6 +161,8 @@ function showCard(card, { animateSettle = false } = {}) {
   currentCard = card;
   renderCard(card, { animateSettle });
   renderStack();
+  document.getElementById("card-scene").style.setProperty("--depth", history.length);
+  document.getElementById("printable-btn").disabled = false;
 }
 
 function promoteFromStack(index) {
@@ -180,10 +185,17 @@ function errorMessage(body, status) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Matches the .storming animation duration in style.css -- keeping the
-// storm on screen for at least this long even when the request comes back
-// instantly is what makes it read as a moment rather than a glitch.
-const STORM_MS = 460;
+// Fed to style.css as --storm-ms: keeping the storm on screen for at least
+// this long even when the request comes back instantly is what makes it
+// read as a moment rather than a glitch.
+const STORM_MS = { off: 460, text: 460, full: 540, unhinged: 760 };
+const MAYHEM_AMP = { off: 1, text: 1.1, full: 1.25, unhinged: 1.6 };
+const MAX_MANA_VALUE = 16;
+const QUAKE_MIN_MANA_VALUE = 10;
+const FACE_DOWN_MIN_MS = 600;
+const SLOW_MS = 1200;
+
+let lastManaValue = null;
 
 async function generate(manaValue) {
   const errorEl = document.getElementById("error");
@@ -191,6 +203,10 @@ async function generate(manaValue) {
   const cardEl = document.getElementById("card");
   const chipsEl = document.getElementById("mv-chips");
   const stackEl = document.getElementById("card-stack");
+  const sceneEl = document.getElementById("card-scene");
+  const statusEl = document.getElementById("status");
+  if (button.disabled) return;
+  lastManaValue = manaValue;
   errorEl.hidden = true;
   // Locked for the duration of the request -- a chip click or stack-card
   // promote mid-fetch would race the response that's already in flight and
@@ -199,18 +215,26 @@ async function generate(manaValue) {
   chipsEl.classList.add("busy");
   stackEl.classList.add("busy");
 
-  // Only play the storm when there's already a card in place to storm --
-  // the very first card on page load just appears.
-  const wasVisible = !cardEl.hidden;
-  if (wasVisible) {
+  const { params, format, mayhem } = buildParams(manaValue);
+  const amp = (0.4 + 1.2 * (Number(manaValue) / MAX_MANA_VALUE)) * MAYHEM_AMP[mayhem];
+  cardEl.style.setProperty("--amp", amp.toFixed(2));
+  cardEl.style.setProperty("--storm-ms", `${STORM_MS[mayhem]}ms`);
+
+  // The first card of the session flips over from a face-down back; every
+  // later one storms in place of the card already on the table.
+  const faceDown = cardEl.classList.contains("face-down");
+  if (faceDown) {
+    cardEl.querySelector(".card-back-caption").textContent = "Shuffling the library…";
+  } else {
     cardEl.classList.remove("settling");
+    cardEl.classList.toggle("unhinged", mayhem === "unhinged");
     cardEl.classList.add("storming");
   }
+  const slowTimer = faceDown ? null : setTimeout(() => (statusEl.textContent = "Shuffling the library…"), SLOW_MS);
 
   try {
-    const { params, format, mayhem } = buildParams(manaValue);
     const fetchPromise = fetch(`/cards/generate?${params}`);
-    const [res] = await Promise.all([fetchPromise, wasVisible ? sleep(STORM_MS) : null]);
+    const [res] = await Promise.all([fetchPromise, sleep(faceDown ? FACE_DOWN_MIN_MS : STORM_MS[mayhem])]);
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new Error(errorMessage(body, res.status));
@@ -220,13 +244,28 @@ async function generate(manaValue) {
     // image" can later request this *exact* card as an image instead of
     // yet another random one (see /cards/generate/image's seed param).
     card._genParams = { mana_value: manaValue, format, mayhem, seed: res.headers.get("X-Momir-Seed") };
-    cardEl.classList.remove("storming");
-    showCard(card, { animateSettle: wasVisible });
+    if (faceDown) {
+      cardEl.classList.add("flip-out");
+      await sleep(180);
+      showCard(card);
+      cardEl.classList.add("flip-in");
+    } else {
+      cardEl.classList.remove("storming");
+      showCard(card, { animateSettle: true });
+      if (Number(manaValue) >= QUAKE_MIN_MANA_VALUE) {
+        sceneEl.classList.remove("quake");
+        void sceneEl.offsetWidth;
+        sceneEl.classList.add("quake");
+      }
+    }
   } catch (err) {
     cardEl.classList.remove("storming");
-    errorEl.textContent = err.message || "Something went wrong.";
+    if (faceDown) cardEl.querySelector(".card-back-caption").textContent = "The spell fizzled.";
+    document.getElementById("error-text").textContent = `The spell fizzled: ${err.message || "something went wrong."}`;
     errorEl.hidden = false;
   } finally {
+    clearTimeout(slowTimer);
+    statusEl.textContent = "";
     button.disabled = false;
     chipsEl.classList.remove("busy");
     stackEl.classList.remove("busy");
@@ -250,7 +289,16 @@ function selectManaValue(value) {
     const selected = chip.dataset.value === value;
     chip.classList.toggle("selected", selected);
     chip.setAttribute("aria-pressed", String(selected));
+    if (selected) chip.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
+  document.getElementById("cost-pip").textContent = value;
+  document.getElementById("generate-btn").setAttribute("aria-label", `Activate with X = ${value}`);
+}
+
+function pickManaValue(value) {
+  if (document.getElementById("generate-btn").disabled) return;
+  selectManaValue(value);
+  generate(value);
 }
 
 // Picking a mana value reveals a card at it immediately -- picking X and
@@ -258,8 +306,7 @@ function selectManaValue(value) {
 document.getElementById("mv-chips").addEventListener("click", (event) => {
   const chip = event.target.closest(".mv-chip");
   if (!chip) return;
-  selectManaValue(chip.dataset.value);
-  generate(chip.dataset.value);
+  pickManaValue(chip.dataset.value);
 });
 
 // The Generate button rerolls at whichever mana value is currently selected.
@@ -280,6 +327,61 @@ document.getElementById("printable-btn").addEventListener("click", () => {
   if (format) params.set("format", format);
   if (seed) params.set("seed", seed);
   window.open(`/cards/generate/image?${params}`, "_blank");
+});
+
+document.getElementById("retry-btn").addEventListener("click", () => {
+  if (lastManaValue !== null) generate(lastManaValue);
+});
+
+const MAYHEM_HINTS = {
+  off: "",
+  text: "Rules text is borrowed from creatures of any mana value.",
+  full: "Cost, stats, types and text are borrowed from any mana value, favoring ones near X.",
+  unhinged: "Anything from any mana value, with no pull toward X, and always some rules text.",
+};
+document.getElementById("mayhem").addEventListener("change", (event) => {
+  const hint = document.getElementById("mayhem-hint");
+  hint.textContent = MAYHEM_HINTS[event.target.value];
+  hint.hidden = !hint.textContent;
+});
+
+// Keyboard play: digits pick X (a leading 1 waits briefly for a second
+// digit, for 10-16), arrows step X, Space/R rerolls, P prints.
+const DIGIT_WAIT_MS = 450;
+let pendingDigit = "";
+let digitTimer = null;
+
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.target.closest("select, input, textarea")) return;
+  const key = event.key;
+
+  if (/^\d$/.test(key)) {
+    clearTimeout(digitTimer);
+    const combined = pendingDigit + key;
+    pendingDigit = "";
+    if (combined.length === 2 && Number(combined) <= MAX_MANA_VALUE) {
+      pickManaValue(combined);
+    } else if (key === "1") {
+      pendingDigit = "1";
+      digitTimer = setTimeout(() => {
+        pendingDigit = "";
+        pickManaValue("1");
+      }, DIGIT_WAIT_MS);
+    } else {
+      pickManaValue(key);
+    }
+  } else if (key === "ArrowLeft" || key === "ArrowRight") {
+    event.preventDefault();
+    const step = key === "ArrowLeft" ? -1 : 1;
+    const next = Math.min(MAX_MANA_VALUE, Math.max(0, Number(selectedManaValue()) + step));
+    if (String(next) !== selectedManaValue()) pickManaValue(String(next));
+  } else if (key === "r" || key === "R" || (key === " " && !event.target.closest("button, [role=button]"))) {
+    event.preventDefault();
+    generate(selectedManaValue());
+  } else if (key === "p" || key === "P") {
+    document.getElementById("printable-btn").click();
+  }
 });
 
 generate(selectedManaValue());

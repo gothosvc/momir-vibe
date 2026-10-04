@@ -49,7 +49,7 @@
   <main>
     <form id="controls" class="controls">
       <div class="mv-picker" role="group" aria-label="Mana value">
-        <span class="mv-label">Mana value</span>
+        <span class="mv-label">X</span>
         <div class="mv-chips" id="mv-chips">
           <button type="button" class="mv-chip" data-value="0" aria-pressed="false">0</button>
           <button type="button" class="mv-chip" data-value="1" aria-pressed="false">1</button>
@@ -89,23 +89,29 @@
             <option value="unhinged">Unhinged</option>
           </select>
         </label>
-        <button type="submit" id="generate-btn">Generate</button>
+        <button type="submit" id="generate-btn" aria-label="Activate with X = 3" title="Reroll (Space or R)"><span class="pip pip-generic" id="cost-pip">3</span> Activate</button>
         <button
           type="button"
           id="printable-btn"
           class="printable-btn"
+          disabled
           title="Opens the card shown below as a printable black &amp; white image, for thermal-printed proxies"
         >
           Printable image ↗
         </button>
       </div>
+      <p id="mayhem-hint" class="mayhem-hint" hidden></p>
     </form>
 
-    <p id="error" class="error" hidden></p>
+    <p id="status" class="status" aria-live="polite"></p>
+    <div id="error" class="error" role="alert" hidden>
+      <span id="error-text"></span>
+      <button type="button" id="retry-btn" class="retry-btn">Try again</button>
+    </div>
 
     <div id="card-scene" class="card-scene">
       <div id="card-stack" class="card-stack"></div>
-      <div id="card" class="card colorless" hidden>
+      <div id="card" class="card colorless face-down" aria-live="polite" aria-atomic="true">
         <div class="card-header">
           <span class="card-name"></span>
           <span class="card-mana"></span>
@@ -120,11 +126,18 @@
           <div class="card-pt"></div>
         </div>
         <div class="card-meta"></div>
+        <div class="card-back" aria-hidden="true">
+          <span class="card-back-mark">Momir Vibe</span>
+          <span class="card-back-caption">Shuffling the library…</span>
+        </div>
       </div>
     </div>
   </main>
 
   <footer class="site-footer">
+    <p class="key-hint">
+      <kbd>0</kbd>–<kbd>16</kbd> pick X · <kbd>←</kbd><kbd>→</kbd> step · <kbd>Space</kbd> reroll · <kbd>P</kbd> print
+    </p>
     Card data and art via <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer">Scryfall</a>.
     Not affiliated with Scryfall or Wizards of the Coast.
   </footer>

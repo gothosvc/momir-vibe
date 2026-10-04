@@ -83,6 +83,7 @@ main {
   align-items: flex-start;
   justify-content: center;
   gap: 1.25rem;
+  max-width: 100%;
   background: linear-gradient(180deg, #2d2d34 0%, #232329 60%, #1f1f25 100%);
   padding: 1rem 1.25rem;
   border-radius: 10px;
@@ -110,7 +111,6 @@ main {
   color: var(--muted);
 }
 
-.controls input,
 .controls select {
   padding: 0.45rem 0.5rem;
   border-radius: 6px;
@@ -121,20 +121,14 @@ main {
   transition: border-color 0.15s ease;
 }
 
-.controls input:hover,
 .controls select:hover {
   border-color: #5a5a66;
 }
 
-.controls input:focus-visible,
 .controls select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-color: var(--accent);
-}
-
-.controls input {
-  width: 5rem;
 }
 
 .controls select {
@@ -149,6 +143,8 @@ main {
 }
 
 .mv-picker {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -158,15 +154,19 @@ main {
 
 .mv-chips {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.3rem;
-  max-width: 230px;
+  overflow-x: auto;
+  padding: 5px;
+  margin: -5px;
+  scrollbar-width: thin;
+  scrollbar-color: #454550 transparent;
 }
 
 /* .mv-chips .mv-chip (not just .mv-chip) so this outweighs the generic
    ".controls button" gold-fill rule above -- these buttons live inside
    .controls too, and a bare-class selector loses that specificity fight. */
 .mv-chips .mv-chip {
+  flex-shrink: 0;
   width: 1.85rem;
   height: 1.85rem;
   padding: 0;
@@ -216,6 +216,19 @@ main {
   cursor: pointer;
 }
 
+#generate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-left: 0.75rem;
+}
+
+#generate-btn .pip {
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: 0.75rem;
+}
+
 .controls button:hover {
   filter: brightness(1.08);
 }
@@ -249,6 +262,50 @@ main {
   cursor: default;
 }
 
+.mayhem-hint {
+  flex-basis: 100%;
+  contain: inline-size;
+  margin: -0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.key-hint {
+  margin: 0 0 0.6rem;
+}
+
+.key-hint kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 0.3em;
+  border: 1px solid #454550;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.95em;
+  color: var(--page-fg);
+}
+
+@media (hover: none) {
+  .key-hint {
+    display: none;
+  }
+}
+
+::selection {
+  background: rgba(201, 162, 75, 0.4);
+  color: var(--page-fg);
+}
+
 .site-footer {
   margin-top: 2rem;
   font-size: 0.75rem;
@@ -266,6 +323,11 @@ main {
 }
 
 .error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem 0.75rem;
   color: #ff8a80;
   background: #3a1f1f;
   border: 1px solid #6b2f2f;
@@ -275,25 +337,40 @@ main {
   text-align: center;
 }
 
+.error[hidden] {
+  display: none;
+}
+
+.retry-btn {
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #ff8a80;
+  background: transparent;
+  color: #ff8a80;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.retry-btn:hover {
+  background: rgba(255, 138, 128, 0.12);
+}
+
+.retry-btn:focus-visible {
+  outline: 2px solid #ff8a80;
+  outline-offset: 2px;
+}
+
 /* --- Card frame --- */
 
-/* Sizing/positioning root for the live card plus its history stack (see
-   .card-stack below) -- both are laid out relative to this, not to each
-   other, so the stack's fixed-aspect-ratio thumbnails never have to match
-   the live card's content-driven height. */
 .card-scene {
+  --step: 44px;
   position: relative;
   z-index: 0; /* gives ::after's z-index:-1 below a local stacking context to sink into, instead of escaping to the page's */
   width: 100%;
   max-width: 340px;
   margin: 0 auto;
-  /* Reserves real flow height down to the fanned stack's deepest hover
-     position, so .site-footer below always sits clear of it instead of the
-     stack (position:absolute, so it doesn't otherwise contribute to this
-     box's height) overlapping footer text. 280px is nth-last-child(4)'s
-     hover --ty (see .card-stack:hover rules below); ~475px is a stack
-     card's own height at this box's max-width (aspect-ratio 63/88). */
-  min-height: 760px;
+  padding-top: calc(var(--depth, 0) * var(--step));
 }
 
 /* Grounds the live card in the scene -- a soft pool on the "table" reads as
@@ -316,6 +393,9 @@ main {
   --rot: 0deg;
   position: relative; /* keeps the live card painted above .card-stack -- see below */
   width: 100%;
+  aspect-ratio: 63 / 88;
+  display: flex;
+  flex-direction: column;
   border-radius: 18px;
   padding: 14px;
   border: 3px solid var(--frame-border);
@@ -327,41 +407,40 @@ main {
   transition: transform 0.25s ease;
 }
 
-/* Cards generated earlier this session, fanned out behind the live card.
-   Positioned (like .card above) with z-index:auto, so plain DOM order
-   decides paint order between the two -- .card-stack comes first in the
-   markup, so the live #card always paints on top without needing an
-   explicit z-index. */
+/* Positioned with z-index:auto like .card above, so DOM order alone keeps
+   the live #card painting on top of the stack. */
 .card-stack {
   position: absolute;
-  inset: 0;
+  top: calc(var(--depth, 0) * var(--step));
+  left: 0;
+  right: 0;
 }
 
 .card.stack-card {
-  /* Each nth-last-child rule below only sets these -- the shared transform
-     underneath composes them, so a container hover (bigger --ty, see the
-     "spread" rules below) and a single card's own --lift never fight each
-     other, they just add up. */
   --tx: 0px;
   --ty: 0px;
   --trot: 0deg;
   --tscale: 1;
   --lift: 0px;
   position: absolute;
-  inset: 0;
-  aspect-ratio: 63 / 88;
-  height: auto;
+  top: 0;
+  left: 0;
+  right: 0;
   cursor: pointer;
+  transform-origin: top center;
   transform: translate(var(--tx), calc(var(--ty) + var(--lift))) rotate(var(--trot)) scale(var(--tscale));
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease, filter 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
 }
 
 .card.stack-card:hover,
 .card.stack-card:focus-visible {
   --lift: -10px;
-  opacity: 1 !important;
-  filter: brightness(1.1);
-  outline: none;
+  filter: brightness(1.1) !important;
+}
+
+.card.stack-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .card-stack.busy {
@@ -369,54 +448,36 @@ main {
   opacity: 0.6;
 }
 
-/* Tucked fan: mostly vertical offset (small --tx) rather than diagonal, so
-   the sliver of each card that peeks out is a forgiving band, not a small
-   corner wedge that needs precise aim on both axes. --ty is chosen so each
-   card's bottom edge clears the one in front of it (which is *less*
-   scaled-down, so it isn't shrinking as fast as it's stepping down) by a
-   real ~28px margin -- not just "a bigger number than last time" -- so
-   every depth gets an actually-exposed band, not just the first one. */
-.card.stack-card:nth-last-child(1) { --tx: 12px; --ty: 45px; --trot: -3deg; --tscale: 0.97; opacity: 0.9; }
-.card.stack-card:nth-last-child(2) { --tx: -16px; --ty: 90px; --trot: 4deg; --tscale: 0.94; opacity: 0.75; }
-.card.stack-card:nth-last-child(3) { --tx: 18px; --ty: 135px; --trot: -4deg; --tscale: 0.91; opacity: 0.6; }
-.card.stack-card:nth-last-child(4) { --tx: -20px; --ty: 180px; --trot: 4deg; --tscale: 0.88; opacity: 0.45; }
+.card.stack-card:nth-last-child(1) { --ty: calc(var(--step) * -1); --tx: 4px;  --trot: -1.5deg; --tscale: 0.97; filter: brightness(0.9); }
+.card.stack-card:nth-last-child(2) { --ty: calc(var(--step) * -2); --tx: -5px; --trot: 2deg;    --tscale: 0.94; filter: brightness(0.8); }
+.card.stack-card:nth-last-child(3) { --ty: calc(var(--step) * -3); --tx: 6px;  --trot: -2deg;   --tscale: 0.91; filter: brightness(0.7); }
+.card.stack-card:nth-last-child(4) { --ty: calc(var(--step) * -4); --tx: -6px; --trot: 2deg;    --tscale: 0.88; filter: brightness(0.6); }
 
-/* Spread: hovering (or tabbing into) the stack at all fans every card out
-   further before the user has aimed at any one of them specifically -- the
-   tucked band above is already enough to land this first hover, and from
-   there the wider clearance (~55px between bottoms, same reasoning as the
-   tucked state) makes the next click easy. Higher specificity than the
-   tucked rules above (four classes vs. three) so it overrides them with no
-   !important needed. Only --ty changes -- --tx/--trot/--tscale keep
-   cascading in from the tucked rule above. */
-.card-stack:hover .stack-card:nth-last-child(1),
-.card-stack:focus-within .stack-card:nth-last-child(1) { --ty: 70px; }
-.card-stack:hover .stack-card:nth-last-child(2),
-.card-stack:focus-within .stack-card:nth-last-child(2) { --ty: 140px; }
-.card-stack:hover .stack-card:nth-last-child(3),
-.card-stack:focus-within .stack-card:nth-last-child(3) { --ty: 210px; }
-.card-stack:hover .stack-card:nth-last-child(4),
-.card-stack:focus-within .stack-card:nth-last-child(4) { --ty: 280px; }
-
-/* Generate's "spell-storm" moment: the frame shudders and its colors
-   flicker through the wheel while the new card is fetched, then the new
-   card slams down at a freshly-rolled tilt. --rot is set per-card in JS
-   (renderCard in app.js) so the card doesn't just sit dead flat. */
+/* --amp (set per roll from mana value and mayhem in app.js) scales the
+   shake and the slam, so a 16-drop hits harder than a 1-drop. */
 .card.storming {
-  animation: storm-shake 460ms ease-in-out, storm-hue 460ms linear;
+  animation: storm-shake var(--storm-ms, 460ms) ease-in-out, storm-hue var(--storm-ms, 460ms) linear;
+}
+
+.card.storming.unhinged {
+  animation: storm-shake var(--storm-ms, 460ms) ease-in-out, storm-hue-unhinged var(--storm-ms, 460ms) linear;
 }
 
 .card.settling {
   animation: settle-bounce 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.card-scene.quake {
+  animation: quake 340ms ease-out;
+}
+
 @keyframes storm-shake {
   0%   { transform: rotate(var(--rot)); }
-  15%  { transform: rotate(calc(var(--rot) - 7deg)) translate(-5px, 3px); }
-  30%  { transform: rotate(calc(var(--rot) + 9deg)) translate(5px, -3px); }
-  45%  { transform: rotate(calc(var(--rot) - 6deg)) translate(-4px, -2px); }
-  60%  { transform: rotate(calc(var(--rot) + 5deg)) translate(4px, 2px); }
-  75%  { transform: rotate(calc(var(--rot) - 3deg)) translate(-2px, 1px); }
+  15%  { transform: rotate(calc(var(--rot) - 7deg * var(--amp, 1))) translate(calc(-5px * var(--amp, 1)), 3px); }
+  30%  { transform: rotate(calc(var(--rot) + 9deg * var(--amp, 1))) translate(calc(5px * var(--amp, 1)), -3px); }
+  45%  { transform: rotate(calc(var(--rot) - 6deg * var(--amp, 1))) translate(calc(-4px * var(--amp, 1)), -2px); }
+  60%  { transform: rotate(calc(var(--rot) + 5deg * var(--amp, 1))) translate(calc(4px * var(--amp, 1)), 2px); }
+  75%  { transform: rotate(calc(var(--rot) - 3deg * var(--amp, 1))) translate(calc(-2px * var(--amp, 1)), 1px); }
   100% { transform: rotate(var(--rot)); }
 }
 
@@ -429,10 +490,121 @@ main {
   100% { filter: hue-rotate(360deg) saturate(1); }
 }
 
+@keyframes storm-hue-unhinged {
+  0%   { filter: hue-rotate(0deg) saturate(1) invert(0); }
+  25%  { filter: hue-rotate(200deg) saturate(3) invert(0.15); }
+  50%  { filter: hue-rotate(420deg) saturate(3.5) invert(0.9); }
+  75%  { filter: hue-rotate(600deg) saturate(3) invert(0.2); }
+  100% { filter: hue-rotate(720deg) saturate(1) invert(0); }
+}
+
 @keyframes settle-bounce {
-  0%   { transform: rotate(var(--rot)) scale(1.12); }
-  55%  { transform: rotate(var(--rot)) scale(0.96); }
+  0%   { transform: rotate(var(--rot)) scale(calc(1 + 0.08 * var(--amp, 1))); }
+  55%  { transform: rotate(var(--rot)) scale(calc(1 - 0.03 * var(--amp, 1))); }
   100% { transform: rotate(var(--rot)) scale(1); }
+}
+
+@keyframes quake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-5px, 3px); }
+  40% { transform: translate(4px, -3px); }
+  60% { transform: translate(-3px, 2px); }
+  80% { transform: translate(2px, -1px); }
+}
+
+/* First card of the session: a face-down back, flipped over on arrival. */
+.card-back {
+  display: none;
+}
+
+.card.face-down {
+  border-color: #14110c;
+  background:
+    radial-gradient(ellipse 46% 40% at 50% 50%, transparent 92%, #c9a24b 93% 96%, transparent 97%),
+    radial-gradient(ellipse 58% 52% at 50% 50%, #3d2a17, #24170c 70%);
+}
+
+.card.face-down > :not(.card-back) {
+  visibility: hidden;
+}
+
+.card.face-down .card-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.card-back-mark {
+  font-family: Metamorphous, Georgia, serif;
+  font-size: 1.6rem;
+  color: #c9a24b;
+}
+
+.card-back-caption {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: rgba(248, 244, 227, 0.6);
+  animation: breathe 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  from { opacity: 0.35; }
+  to   { opacity: 1; }
+}
+
+.card.flip-out {
+  animation: flip-out 180ms cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+.card.flip-in {
+  animation: flip-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes flip-out {
+  from { transform: perspective(900px) rotate(var(--rot)) rotateY(0deg); }
+  to   { transform: perspective(900px) rotate(var(--rot)) rotateY(90deg); }
+}
+
+@keyframes flip-in {
+  from { transform: perspective(900px) rotate(var(--rot)) rotateY(-90deg); }
+  to   { transform: perspective(900px) rotate(var(--rot)) rotateY(0deg); }
+}
+
+/* Legendary foil: one diagonal sweep when the card lands, again on hover. */
+.card.legendary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.55) 45%,
+    rgba(255, 214, 140, 0.45) 50%,
+    rgba(140, 200, 255, 0.35) 55%,
+    transparent 65%
+  );
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  mix-blend-mode: overlay;
+  opacity: 0;
+}
+
+.card.legendary.settling::after,
+.card.legendary.flip-in::after,
+.card.legendary:hover::after {
+  animation: foil 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes foil {
+  from { background-position: 100% 0; opacity: 1; }
+  to   { background-position: 0% 0; opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -442,8 +614,13 @@ main {
     transition: none;
   }
   .card.storming,
-  .card.settling {
-    animation: none;
+  .card.settling,
+  .card.flip-out,
+  .card.flip-in,
+  .card-scene.quake,
+  .card-back-caption,
+  .card.legendary::after {
+    animation: none !important;
   }
 }
 
@@ -517,7 +694,7 @@ main {
 .card-art {
   /* Scryfall art_crop images aren't a fixed size, so this starts as a
      reasonable placeholder ratio and gets set precisely in JS once the
-     image loads (see setArtAspectRatio in app.js) -- that way the box
+     image loads (see populateCard in app.js) -- that way the box
      always matches the real image instead of cropping it via object-fit. */
   aspect-ratio: 626 / 457;
   height: auto;
@@ -561,6 +738,7 @@ main {
 }
 
 .card-text-box {
+  flex: 1 0 auto;
   position: relative;
   background: var(--text-box-bg);
   color: var(--text-box-fg);
@@ -597,11 +775,20 @@ main {
 }
 
 .card-meta {
+  align-self: center;
   margin-top: 0.7rem;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.65rem;
-  color: rgba(20, 17, 12, 0.65);
+  font-size: 0.7rem;
+  color: #14110c;
   text-align: center;
+}
+
+.card.black .card-header,
+.card.black .card-type {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* Color frames */
@@ -612,3 +799,30 @@ main {
 .card.green   { --frame-a: #b6d9ae; --frame-b: #4c7a45; }
 .card.gold    { --frame-a: #f1dfa0; --frame-b: #c9a24b; }
 .card.colorless { --frame-a: #d6d3ca; --frame-b: #9a978f; }
+
+@media (max-width: 600px) {
+  .controls {
+    position: static;
+  }
+
+  .controls-secondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .controls select {
+    width: 100%;
+  }
+
+  #generate-btn {
+    justify-content: center;
+  }
+}
+
+@media (pointer: coarse) {
+  .mv-chips .mv-chip {
+    width: 44px;
+    height: 44px;
+  }
+}
