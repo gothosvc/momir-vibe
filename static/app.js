@@ -48,9 +48,9 @@ function renderManaCost(manaCost) {
   return [...manaCost.matchAll(/\{([^}]+)\}/g)].map((m) => renderPip(m[1])).join("");
 }
 
-const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;" };
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function escapeHtml(str) {
-  return str.replace(/[&<>]/g, (c) => HTML_ESCAPES[c]);
+  return str.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
 // Renders prose that may contain inline {W}/{2}/{T}-style symbols (keyword
